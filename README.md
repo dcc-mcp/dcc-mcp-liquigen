@@ -97,6 +97,26 @@ vx uv run dcc-mcp-liquigen `
   --allowed-root <ABSOLUTE-WORKSPACE>
 ```
 
+## Internal `liquigen_setup` integration
+
+An internal Rez/Lightbox setup package can export the approved hook location
+before starting the adapter:
+
+```powershell
+$env:DCC_MCP_LIQUIGEN_COMMAND_HOOK_DLL = "<approved-hook-dll>"
+```
+
+或者由 setup 包直接调用统一启动器：
+
+```powershell
+dcc-mcp-liquigen-launch --executable "<liquigen-exe>" --hook-dll "<approved-hook-dll>" --allowed-root "<workspace>"
+```
+
+The command client reads this variable for each invocation and otherwise uses
+the installed bridge generation. The setup package remains responsible for
+starting the licensed LiquiGen executable and passing its exact PID/HWND to
+`dcc-mcp-liquigen`; the adapter never starts or modifies the host implicitly.
+
 Use `dcc-mcp-cli list`, followed by `search -> describe -> call`. Until the
 LiquiGen catalog registration lands in `dcc-mcp-core`, the package entry point
 can be used directly from this checkout.

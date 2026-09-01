@@ -43,6 +43,7 @@ dev = [
 dcc-mcp-liquigen = "dcc_mcp_liquigen.server:main"
 dcc-mcp-liquigen-doctor = "dcc_mcp_liquigen.doctor:main"
 dcc-mcp-liquigen-menu = "dcc_mcp_liquigen.companion_menu:main"
+dcc-mcp-liquigen-launch = "dcc_mcp_liquigen.launch:main"
 
 [project.entry-points."dcc_mcp.adapters"]
 liquigen = "dcc_mcp_liquigen:LiquiGenMcpServer"
