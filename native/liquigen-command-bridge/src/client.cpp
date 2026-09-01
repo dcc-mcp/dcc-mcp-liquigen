@@ -119,6 +119,20 @@ bool ProjectPathPayload(const std::wstring& path, std::string* result) noexcept 
 }
 
 std::wstring HookPath() {
+    // Lightbox/Rez setup packages may provide the bridge from a centrally
+    // managed location.  Prefer the explicit path, while retaining the
+    // installed-client sibling as the development/default fallback.
+    wchar_t configured[32768]{};
+    const auto configured_length = GetEnvironmentVariableW(
+        L"DCC_MCP_LIQUIGEN_COMMAND_HOOK_DLL", configured, ARRAYSIZE(configured));
+    if (configured_length > 0 && configured_length < ARRAYSIZE(configured)) {
+        const auto attributes = GetFileAttributesW(configured);
+        if (attributes != INVALID_FILE_ATTRIBUTES &&
+            (attributes & FILE_ATTRIBUTE_DIRECTORY) == 0) {
+            return std::wstring(configured);
+        }
+        return {};
+    }
     wchar_t path[32768]{};
     const auto length = GetModuleFileNameW(nullptr, path, ARRAYSIZE(path));
     if (length == 0 || length >= ARRAYSIZE(path)) {

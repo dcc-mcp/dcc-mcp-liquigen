@@ -17,6 +17,18 @@ def test_installer_retries_transient_windows_launcher_lock():
     assert "dcc_mcp_liquigen_command_client.exe" in installer
 
 
+def test_internal_launch_and_hook_contract_is_documented():
+    readme = (PROJECT_ROOT / "README.md").read_text(encoding="utf-8")
+    bridge_readme = (PROJECT_ROOT / "native" / "liquigen-command-bridge" / "README.md").read_text(
+        encoding="utf-8"
+    )
+    assert "DCC_MCP_LIQUIGEN_COMMAND_HOOK_DLL" in readme
+    assert "DCC_MCP_LIQUIGEN_COMMAND_HOOK_DLL" in bridge_readme
+    assert "dcc-mcp-liquigen-launch" in (PROJECT_ROOT / "pyproject.toml").read_text(
+        encoding="utf-8"
+    )
+
+
 def test_public_bundle_contains_only_external_adapter_payload(tmp_path: Path):
     project = tmp_path / "project"
     wheel = project / "dist" / "dcc_mcp_liquigen-0.1.0-py3-none-any.whl"
