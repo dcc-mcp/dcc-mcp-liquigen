@@ -1,0 +1,24 @@
+{
+  "FileVersion": 3,
+  "EngineAssociation": "5.8",
+  "Category": "DCC-MCP local validation",
+  "Description": "Local UE 5.8 receiver for a LiquiGen image flipbook",
+  "Plugins": [
+    {
+      "Name": "PythonScriptPlugin",
+      "Enabled": true
+    },
+    {
+      "Name": "EditorScriptingUtilities",
+      "Enabled": true
+    },
+    {
+      "Name": "Niagara",
+      "Enabled": true
+    },
+    {
+      "Name": "CascadeToNiagaraConverter",
+      "Enabled": true
+    }
+  ]
+}

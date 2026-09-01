@@ -1,0 +1,66 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "dcc-mcp-liquigen"
+version = "0.1.0"
+description = "Transactional LiquiGen node graphs and Unreal export validation for DCC-MCP"
+readme = "README.md"
+requires-python = ">=3.9"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "loonghao", email = "hal.long@outlook.com" }]
+keywords = ["liquigen", "liquid", "vfx", "unreal", "mcp", "dcc", "automation"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Operating System :: Microsoft :: Windows",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Multimedia :: Graphics",
+]
+dependencies = ["dcc-mcp-core>=0.20.22,<1.0.0"]
+
+[project.urls]
+Homepage = "https://github.com/dcc-mcp/dcc-mcp-liquigen"
+Repository = "https://github.com/dcc-mcp/dcc-mcp-liquigen"
+Issues = "https://github.com/dcc-mcp/dcc-mcp-liquigen/issues"
+
+[project.optional-dependencies]
+dev = [
+    "build>=1.2",
+    "capstone>=5,<6",
+    "pefile>=2024.8.26",
+    "pytest>=8",
+    "ruff>=0.8",
+    "twine>=6",
+]
+
+[project.scripts]
+dcc-mcp-liquigen = "dcc_mcp_liquigen.server:main"
+dcc-mcp-liquigen-doctor = "dcc_mcp_liquigen.doctor:main"
+dcc-mcp-liquigen-menu = "dcc_mcp_liquigen.companion_menu:main"
+
+[project.entry-points."dcc_mcp.adapters"]
+liquigen = "dcc_mcp_liquigen:LiquiGenMcpServer"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["dcc_mcp_liquigen*"]
+
+[tool.setuptools.package-data]
+dcc_mcp_liquigen = ["skills/**/*.md", "skills/**/*.yaml", "skills/**/*.py"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src", "."]
+
+[tool.ruff]
+target-version = "py39"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B"]

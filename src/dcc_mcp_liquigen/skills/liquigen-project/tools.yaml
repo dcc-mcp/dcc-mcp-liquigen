@@ -1,0 +1,697 @@
+tools:
+  - name: get_status
+    description: Return the exact LiquiGen PID/HWND binding and confirmed automation boundary.
+    source_file: scripts/get_status.py
+    input_schema:
+      type: object
+      properties: {}
+      additionalProperties: false
+    output_schema:
+      type: object
+      properties:
+        success: {type: boolean}
+        context: {type: object}
+      required: [success, context]
+    execution: sync
+    job_strategy: monolithic
+    affinity: any
+    enforce_thread_affinity: true
+    timeout_hint_secs: 10
+    annotations:
+      read_only_hint: true
+      destructive_hint: false
+      idempotent_hint: true
+      open_world_hint: false
+    tags: [read-only, liquigen]
+
+  - name: list_host_commands
+    description: List the enumerated LiquiGen UI-thread commands exposed by the local semantic bridge without CUA or raw input.
+    source_file: scripts/list_host_commands.py
+    input_schema:
+      type: object
+      properties: {}
+      additionalProperties: false
+    output_schema:
+      type: object
+      properties:
+        success: {type: boolean}
+        context: {type: object}
+      required: [success, context]
+    execution: sync
+    job_strategy: monolithic
+    affinity: any
+    enforce_thread_affinity: true
+    timeout_hint_secs: 10
+    annotations:
+      read_only_hint: true
+      destructive_hint: false
+      idempotent_hint: true
+      open_world_hint: false
+    tags: [read-only, liquigen, host-command]
+
+  - name: invoke_host_command
+    description: Deliver one whitelisted named command to the exact LiquiGen UI thread without mouse, keyboard, CUA, executable hashes, or arbitrary native calls.
+    source_file: scripts/invoke_host_command.py
+    input_schema:
+      type: object
+      properties:
+        command:
+          type: string
+          enum:
+            - project_open
+            - project_save
+            - play_timeline
+            - pause_timeline
+            - export_all
+            - export_selected
+            - open_command_palette
+            - switch_tab_to_export
+            - switch_tab_to_viewport
+            - toggle_fullscreen_graph
+            - toggle_project_palette
+            - show_project_palette
+            - return_to_project
+            - center_graph
+            - reset_graph_zoom
+            - center_graph_on_selection
+            - open_project_path
+        project_path:
+          type: string
+          description: Absolute allowed-root .liquigen path required by open_project_path.
+        timeout_ms: {type: integer, minimum: 100, maximum: 60000, default: 5000}
+      required: [command]
+      additionalProperties: false
+    output_schema:
+      type: object
+      properties:
+        success: {type: boolean}
+        context: {type: object}
+      required: [success, context]
+    execution: sync
+    job_strategy: monolithic
+    affinity: any
+    enforce_thread_affinity: true
+    timeout_hint_secs: 65
+    annotations:
+      read_only_hint: false
+      destructive_hint: false
+      idempotent_hint: false
+      open_world_hint: false
+    tags: [liquigen, host-command, timeline, export]
+    call_examples:
+      - arguments: {command: pause_timeline}
+        note: Pause the bound LiquiGen timeline through its named command route.
+      - arguments: {command: export_all, timeout_ms: 10000}
+        note: Ask LiquiGen to execute its configured Export All operation.
+      - arguments:
+          command: open_project_path
+          project_path: C:/dcc-mcp/projects/chain-burst.liquigen
+          timeout_ms: 30000
+        note: Load an exact project path through LiquiGen's native project loader without a file dialog.
+
+  - name: run_export_workflow
+    description: Open a project, simulate, export all, wait for a fresh stable output bundle, and validate the Unreal handoff without CUA.
+    source_file: scripts/run_export_workflow.py
+    input_schema:
+      type: object
+      properties:
+        project_path:
+          type: string
+          description: Absolute allowed-root .liquigen path to load through the native project loader.
+        output_directory:
+          type: string
+          description: Absolute allowed-root directory configured on at least one enabled export node.
+        simulate_seconds: {type: number, minimum: 0, maximum: 300, default: 12}
+        timeout_seconds: {type: number, minimum: 1, maximum: 1800, default: 600}
+        stable_seconds: {type: number, minimum: 0.5, maximum: 30, default: 3}
+        poll_interval_seconds: {type: number, minimum: 0.1, maximum: 5, default: 0.5}
+        settle_seconds: {type: number, minimum: 0, maximum: 30, default: 2}
+      required: [project_path, output_directory]
+      additionalProperties: false
+    output_schema:
+      type: object
+      properties:
+        success: {type: boolean}
+        context: {type: object}
+      required: [success, context]
+    execution: sync
+    job_strategy: monolithic
+    affinity: any
+    enforce_thread_affinity: true
+    timeout_hint_secs: 1810
+    annotations:
+      read_only_hint: false
+      destructive_hint: false
+      idempotent_hint: false
+      open_world_hint: false
+    tags: [liquigen, host-command, simulation, export, unreal, validation]
+    call_examples:
+      - arguments:
+          project_path: C:/dcc-mcp/projects/LiquiGen_ChainBurst_UE58.liquigen
+          output_directory: C:/dcc-mcp/exports/chain-burst
+          simulate_seconds: 12
+          timeout_seconds: 600
+        note: Run the complete semantic LiquiGen-to-validated-bundle stage with freshness proof.
+
+  - name: discover_presets
+    description: List official LiquiGen presets/templates from the bound installation.
+    source_file: scripts/discover_presets.py
+    input_schema:
+      type: object
+      properties:
+        query: {type: string, maxLength: 128}
+        limit: {type: integer, minimum: 1, maximum: 500, default: 100}
+      additionalProperties: false
+    output_schema:
+      type: object
+      properties:
+        success: {type: boolean}
+        context: {type: object}
+      required: [success, context]
+    execution: sync
+    job_strategy: monolithic
+    affinity: any
+    enforce_thread_affinity: true
+    timeout_hint_secs: 30
+    annotations:
+      read_only_hint: true
+      destructive_hint: false
+      idempotent_hint: true
+      open_world_hint: false
+    tags: [read-only, liquigen]
+    call_examples:
+      - arguments: {query: "splat", limit: 20}
+        note: Find game-oriented splash and splat presets.
+
+  - name: inspect_project
+    description: Inspect bounded metadata, hashes, node types, and selected export tokens in a .liquigen project.
+    source_file: scripts/inspect_project.py
+    input_schema:
+      type: object
+      properties:
+        path: {type: string, minLength: 1, maxLength: 4096}
+      required: [path]
+      additionalProperties: false
+    output_schema:
+      type: object
+      properties:
+        success: {type: boolean}
+        context: {type: object}
+      required: [success, context]
+    execution: sync
+    job_strategy: monolithic
+    affinity: any
+    enforce_thread_affinity: true
+    timeout_hint_secs: 30
+    annotations:
+      read_only_hint: true
+      destructive_hint: false
+      idempotent_hint: true
+      open_world_hint: false
+    tags: [read-only, liquigen]
+    call_examples:
+      - arguments: {path: "C:/workspace/effects/splash.liquigen"}
+
+  - name: validate_project
+    description: Validate LiquiGen graph structure and optionally require a recognized Unreal-compatible export mode.
+    source_file: scripts/validate_project.py
+    input_schema:
+      type: object
+      properties:
+        path: {type: string, minLength: 1, maxLength: 4096}
+        require_unreal_export: {type: boolean, default: false}
+      required: [path]
+      additionalProperties: false
+    output_schema:
+      type: object
+      properties:
+        success: {type: boolean}
+        context: {type: object}
+      required: [success, context]
+    execution: sync
+    job_strategy: monolithic
+    affinity: any
+    enforce_thread_affinity: true
+    timeout_hint_secs: 30
+    annotations:
+      read_only_hint: true
+      destructive_hint: false
+      idempotent_hint: true
+      open_world_hint: false
+    tags: [read-only, liquigen, unreal]
+
+  - name: stage_project_copy
+    description: Create a new byte-identical .liquigen project copy without overwriting any path.
+    source_file: scripts/stage_project_copy.py
+    input_schema:
+      type: object
+      properties:
+        source: {type: string, minLength: 1, maxLength: 4096}
+        destination: {type: string, minLength: 1, maxLength: 4096}
+      required: [source, destination]
+      additionalProperties: false
+    output_schema:
+      type: object
+      properties:
+        success: {type: boolean}
+        context: {type: object}
+      required: [success, context]
+    execution: sync
+    job_strategy: monolithic
+    affinity: any
+    enforce_thread_affinity: true
+    timeout_hint_secs: 30
+    annotations:
+      read_only_hint: false
+      destructive_hint: false
+      idempotent_hint: false
+      open_world_hint: false
+    tags: [pipeline, liquigen]
+
+  - name: validate_unreal_export_bundle
+    description: Validate a bounded LiquiGen VAT, Alembic, flipbook, or OpenVDB output bundle before UE import and classify its rendering role.
+    source_file: scripts/validate_unreal_export_bundle.py
+    input_schema:
+      type: object
+      properties:
+        path: {type: string, minLength: 1, maxLength: 4096}
+        columns: {type: integer, minimum: 1, maximum: 64}
+        rows: {type: integer, minimum: 1, maximum: 64}
+      required: [path]
+      additionalProperties: false
+    output_schema:
+      type: object
+      properties:
+        success: {type: boolean}
+        context: {type: object}
+      required: [success, context]
+    execution: sync
+    job_strategy: monolithic
+    affinity: any
+    enforce_thread_affinity: true
+    timeout_hint_secs: 60
+    annotations:
+      read_only_hint: true
+      destructive_hint: false
+      idempotent_hint: true
+      open_world_hint: false
+    tags: [read-only, pipeline, liquigen, unreal]
+    call_examples:
+      - arguments: {path: "C:/workspace/effects/splash/export", columns: 8, rows: 8}
+        note: Validate an 8x8 image flipbook bundle for Unreal.
+      - arguments: {path: "C:/workspace/effects/splash/vdb_velocity"}
+        note: Validate an auxiliary LiquiGen velocity-field sequence for UE Sparse Volume Texture import.
+
+  - name: list_node_schemas
+    description: Discover node types, parameters, pin names, and exact compatible connection signatures from the installed official LiquiGen projects.
+    source_file: scripts/list_node_schemas.py
+    input_schema:
+      type: object
+      properties:
+        query: {type: string, maxLength: 128, default: ""}
+        limit: {type: integer, minimum: 1, maximum: 500, default: 100}
+      additionalProperties: false
+    output_schema:
+      type: object
+      properties:
+        success: {type: boolean}
+        context: {type: object}
+      required: [success, context]
+    execution: sync
+    job_strategy: monolithic
+    affinity: any
+    enforce_thread_affinity: true
+    timeout_hint_secs: 30
+    annotations:
+      read_only_hint: true
+      destructive_hint: false
+      idempotent_hint: true
+      open_world_hint: false
+    tags: [read-only, liquigen, graph]
+
+  - name: inspect_project_graph
+    description: Return structured LiquiGen nodes, parameters, keyframes, typed connections, graph groups/notes, project settings, and camera selection from a bounded project.
+    source_file: scripts/inspect_project_graph.py
+    input_schema:
+      type: object
+      properties:
+        path: {type: string, minLength: 1, maxLength: 4096}
+        node_type: {type: string, maxLength: 128, default: ""}
+        limit: {type: integer, minimum: 1, maximum: 500, default: 200}
+      required: [path]
+      additionalProperties: false
+    output_schema:
+      type: object
+      properties:
+        success: {type: boolean}
+        context: {type: object}
+      required: [success, context]
+    execution: sync
+    job_strategy: monolithic
+    affinity: any
+    enforce_thread_affinity: true
+    timeout_hint_secs: 30
+    annotations:
+      read_only_hint: true
+      destructive_hint: false
+      idempotent_hint: true
+      open_world_hint: false
+    tags: [read-only, liquigen, graph]
+
+  - name: apply_graph_transaction
+    description: Atomically edit LiquiGen nodes, parameters, keyframes, exact typed connections, graph groups/notes, project settings, and camera selection into a new validated project file.
+    source_file: scripts/apply_graph_transaction.py
+    input_schema:
+      type: object
+      properties:
+        source: {type: string, minLength: 1, maxLength: 4096}
+        destination: {type: string, minLength: 1, maxLength: 4096}
+        expected_source_sha256: {type: string, pattern: "^$|^[A-Fa-f0-9]{64}$", default: ""}
+        operations:
+          type: array
+          minItems: 1
+          maxItems: 256
+          items:
+            oneOf:
+              - type: object
+                properties:
+                  op: {const: create_node}
+                  alias: {type: string, minLength: 1, maxLength: 128}
+                  node_type: {type: string, minLength: 1, maxLength: 128}
+                  position:
+                    type: array
+                    items: {type: number}
+                    minItems: 2
+                    maxItems: 2
+                  label: {type: string, maxLength: 512}
+                  parameters: {type: object, additionalProperties: true}
+                required: [op, alias, node_type]
+                additionalProperties: false
+              - type: object
+                properties:
+                  op: {const: clone_node}
+                  node: {oneOf: [{type: integer}, {type: string, minLength: 1, maxLength: 128}]}
+                  alias: {type: string, minLength: 1, maxLength: 128}
+                  position:
+                    type: array
+                    items: {type: number}
+                    minItems: 2
+                    maxItems: 2
+                  label: {type: string, maxLength: 512}
+                  parameters: {type: object, additionalProperties: true}
+                required: [op, node, alias]
+                additionalProperties: false
+              - type: object
+                properties:
+                  op: {const: delete_node}
+                  node: {oneOf: [{type: integer}, {type: string, minLength: 1, maxLength: 128}]}
+                required: [op, node]
+                additionalProperties: false
+              - type: object
+                properties:
+                  op: {enum: [add_parameter, set_parameter]}
+                  node: {oneOf: [{type: integer}, {type: string, minLength: 1, maxLength: 128}]}
+                  name: {type: string, minLength: 1, maxLength: 256}
+                  value: {}
+                required: [op, node, name, value]
+                additionalProperties: false
+              - type: object
+                properties:
+                  op: {const: set_keyframes}
+                  node: {oneOf: [{type: integer}, {type: string, minLength: 1, maxLength: 128}]}
+                  name: {type: string, minLength: 1, maxLength: 256}
+                  loop_mode: {type: string, maxLength: 64, default: None}
+                  keys:
+                    type: array
+                    minItems: 1
+                    maxItems: 4096
+                    items:
+                      type: object
+                      properties:
+                        position: {type: number}
+                        value: {type: number}
+                        interpolation: {type: string, enum: [Constant, Linear, Smooth], default: Constant}
+                      required: [position, value]
+                      additionalProperties: false
+                required: [op, node, name, keys]
+                additionalProperties: false
+              - type: object
+                properties:
+                  op: {const: clear_keyframes}
+                  node: {oneOf: [{type: integer}, {type: string, minLength: 1, maxLength: 128}]}
+                  name: {type: string, minLength: 1, maxLength: 256}
+                  value: {}
+                required: [op, node, name, value]
+                additionalProperties: false
+              - type: object
+                properties:
+                  op: {const: set_node_state}
+                  node: {oneOf: [{type: integer}, {type: string, minLength: 1, maxLength: 128}]}
+                  label: {type: string, maxLength: 512}
+                  position:
+                    type: array
+                    items: {type: number}
+                    minItems: 2
+                    maxItems: 2
+                  disabled: {type: boolean}
+                  on: {type: boolean}
+                required: [op, node]
+                additionalProperties: false
+              - type: object
+                properties:
+                  op: {const: create_group}
+                  comment: {type: string, maxLength: 2048}
+                  color_index: {type: integer, minimum: 0, maximum: 255, default: 0}
+                  position:
+                    type: array
+                    items: {type: number}
+                    minItems: 2
+                    maxItems: 2
+                  size:
+                    type: array
+                    items: {type: number, exclusiveMinimum: 0}
+                    minItems: 2
+                    maxItems: 2
+                required: [op]
+                additionalProperties: false
+              - type: object
+                properties:
+                  op: {const: update_group}
+                  group_index: {type: integer, minimum: 0}
+                  comment: {type: string, maxLength: 2048}
+                  color_index: {type: integer, minimum: 0, maximum: 255}
+                  position:
+                    type: array
+                    items: {type: number}
+                    minItems: 2
+                    maxItems: 2
+                  size:
+                    type: array
+                    items: {type: number, exclusiveMinimum: 0}
+                    minItems: 2
+                    maxItems: 2
+                required: [op, group_index]
+                additionalProperties: false
+              - type: object
+                properties:
+                  op: {const: delete_group}
+                  group_index: {type: integer, minimum: 0}
+                required: [op, group_index]
+                additionalProperties: false
+              - type: object
+                properties:
+                  op: {const: create_note}
+                  text: {type: string, maxLength: 8192}
+                  position:
+                    type: array
+                    items: {type: number}
+                    minItems: 2
+                    maxItems: 2
+                  size:
+                    type: array
+                    items: {type: number, exclusiveMinimum: 0}
+                    minItems: 2
+                    maxItems: 2
+                required: [op]
+                additionalProperties: false
+              - type: object
+                properties:
+                  op: {const: update_note}
+                  note_index: {type: integer, minimum: 0}
+                  text: {type: string, maxLength: 8192}
+                  position:
+                    type: array
+                    items: {type: number}
+                    minItems: 2
+                    maxItems: 2
+                  size:
+                    type: array
+                    items: {type: number, exclusiveMinimum: 0}
+                    minItems: 2
+                    maxItems: 2
+                required: [op, note_index]
+                additionalProperties: false
+              - type: object
+                properties:
+                  op: {const: delete_note}
+                  note_index: {type: integer, minimum: 0}
+                required: [op, note_index]
+                additionalProperties: false
+              - type: object
+                properties:
+                  op: {const: set_project_setting}
+                  name: {type: string, minLength: 1, maxLength: 128}
+                  value: {}
+                required: [op, name, value]
+                additionalProperties: false
+              - type: object
+                properties:
+                  op: {const: set_current_camera}
+                  node: {oneOf: [{type: integer}, {type: string, minLength: 1, maxLength: 128}]}
+                required: [op, node]
+                additionalProperties: false
+              - type: object
+                properties:
+                  op: {enum: [connect, disconnect]}
+                  from_node: {oneOf: [{type: integer}, {type: string, minLength: 1, maxLength: 128}]}
+                  from_pin: {type: string, minLength: 1, maxLength: 128}
+                  to_node: {oneOf: [{type: integer}, {type: string, minLength: 1, maxLength: 128}]}
+                  to_pin: {type: string, minLength: 1, maxLength: 128}
+                required: [op, from_node, from_pin, to_node, to_pin]
+                additionalProperties: false
+      required: [source, destination, operations]
+      additionalProperties: false
+    output_schema:
+      type: object
+      properties:
+        success: {type: boolean}
+        context: {type: object}
+      required: [success, context]
+    execution: sync
+    job_strategy: monolithic
+    affinity: any
+    enforce_thread_affinity: true
+    timeout_hint_secs: 60
+    annotations:
+      read_only_hint: false
+      destructive_hint: false
+      idempotent_hint: false
+      open_world_hint: false
+    tags: [pipeline, liquigen, graph, animation]
+
+  - name: plan_liquid_chain_burst
+    description: Compile an ordered, replayable LiquiGen liquid chain-burst node plan and Unreal handoff contract without mutating the host.
+    source_file: scripts/plan_liquid_chain_burst.py
+    input_schema:
+      type: object
+      properties:
+        output_directory: {type: string, minLength: 3, maxLength: 4096}
+        burst_count: {type: integer, minimum: 2, maximum: 12, default: 5}
+        delay_seconds: {type: number, minimum: 0.05, maximum: 2.0, default: 0.18}
+        spacing_m: {type: number, exclusiveMinimum: 0, maximum: 100, default: 2.6}
+        export_profile:
+          type: string
+          enum: [ue_vat, alembic, flipbook, vdb_velocity]
+          default: ue_vat
+      required: [output_directory]
+      additionalProperties: false
+    output_schema:
+      type: object
+      properties:
+        success: {type: boolean}
+        context: {type: object}
+      required: [success, context]
+    execution: sync
+    job_strategy: monolithic
+    affinity: any
+    enforce_thread_affinity: true
+    timeout_hint_secs: 10
+    annotations:
+      read_only_hint: true
+      destructive_hint: false
+      idempotent_hint: true
+      open_world_hint: false
+    tags: [read-only, pipeline, liquigen, unreal, vfx]
+    call_examples:
+      - arguments:
+          output_directory: "C:/workspace/effects/liquid-chain-vat"
+          burst_count: 5
+          delay_seconds: 0.18
+          spacing_m: 2.6
+          export_profile: ue_vat
+        note: Plan a five-burst LiquiGen node graph and Unreal VAT handoff.
+
+  - name: create_liquid_chain_burst_project
+    description: Create and validate a connected, timed LiquiGen liquid-chain-burst project with UE VAT and flipbook export nodes, without CUA.
+    source_file: scripts/create_liquid_chain_burst_project.py
+    input_schema:
+      type: object
+      properties:
+        source: {type: string, minLength: 1, maxLength: 4096}
+        destination: {type: string, minLength: 1, maxLength: 4096}
+        output_directory: {type: string, minLength: 3, maxLength: 4096}
+        burst_count: {type: integer, minimum: 2, maximum: 12, default: 5}
+        delay_seconds: {type: number, minimum: 0.05, maximum: 2.0, default: 0.18}
+        spacing_m: {type: number, exclusiveMinimum: 0, maximum: 100, default: 2.6}
+        export_profile: {type: string, enum: [ue_vat, alembic, flipbook], default: ue_vat}
+      required: [source, destination, output_directory]
+      additionalProperties: false
+    output_schema:
+      type: object
+      properties:
+        success: {type: boolean}
+        context: {type: object}
+      required: [success, context]
+    execution: sync
+    job_strategy: monolithic
+    affinity: any
+    enforce_thread_affinity: true
+    timeout_hint_secs: 60
+    annotations:
+      read_only_hint: false
+      destructive_hint: false
+      idempotent_hint: false
+      open_world_hint: false
+    tags: [pipeline, liquigen, graph, animation, unreal, vfx]
+
+  - name: prepare_unreal_water_project
+    description: Preserve an installed official LiquiGen water preset and add one canonical Unreal 5.8 VAT export route without changing its water appearance or using CUA.
+    source_file: scripts/prepare_unreal_water_project.py
+    input_schema:
+      type: object
+      properties:
+        source: {type: string, minLength: 1, maxLength: 4096}
+        destination: {type: string, minLength: 1, maxLength: 4096}
+        output_directory: {type: string, minLength: 3, maxLength: 4096}
+        asset_name:
+          type: string
+          pattern: "^[A-Za-z][A-Za-z0-9_]{0,127}$"
+          default: LiquiGen_BallDropSplash
+        frame_count: {type: integer, minimum: 1, maximum: 4096, default: 64}
+      required: [source, destination, output_directory]
+      additionalProperties: false
+    output_schema:
+      type: object
+      properties:
+        success: {type: boolean}
+        context: {type: object}
+      required: [success, context]
+    execution: sync
+    job_strategy: monolithic
+    affinity: any
+    enforce_thread_affinity: true
+    timeout_hint_secs: 60
+    annotations:
+      read_only_hint: false
+      destructive_hint: false
+      idempotent_hint: false
+      open_world_hint: false
+    tags: [pipeline, liquigen, graph, unreal, water, vat]
+    call_examples:
+      - arguments:
+          source: "C:/LiquiGen/presets_1_0_0/ball_drop_splash.liquigen"
+          destination: "C:/workspace/water/ball-drop-ue58.liquigen"
+          output_directory: "C:/workspace/water/export-v1"
+          asset_name: LiquiGen_BallDropSplash
+          frame_count: 64
+        note: Stage the installed official ball-drop splash preset for a canonical Unreal VAT export.

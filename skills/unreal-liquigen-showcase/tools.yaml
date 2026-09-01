@@ -1,0 +1,336 @@
+tools:
+  - name: probe_vat_receiver
+    description: Read-only verification that UE 5.8 exposes the SideFX fluid VAT material and every Python API used by the receiver.
+    source_file: scripts/probe_vat_receiver.py
+    execution: sync
+    affinity: main
+    enforce_thread_affinity: true
+    timeout_hint_secs: 30
+    annotations:
+      read_only_hint: true
+      destructive_hint: false
+      idempotent_hint: true
+      open_world_hint: false
+    input_schema:
+      type: object
+      properties: {}
+    output_schema:
+      type: object
+    next-tools:
+      on-success: [unreal_liquigen_showcase__import_vat_bundle]
+      on-failure: [dcc_diagnostics__audit_log]
+
+  - name: import_vat_bundle
+    description: Stage a canonical LiquiGen fluid VAT FBX/EXR/JSON bundle and author its SideFX Dynamic Remeshing material before parameter finalization.
+    source_file: scripts/import_vat_bundle.py
+    execution: sync
+    affinity: main
+    enforce_thread_affinity: true
+    timeout_hint_secs: 240
+    annotations:
+      read_only_hint: false
+      destructive_hint: true
+      idempotent_hint: false
+      open_world_hint: false
+    input_schema:
+      type: object
+      required: [source_directory, destination, asset_prefix, source_kind]
+      properties:
+        source_directory:
+          type: string
+          minLength: 3
+          description: Absolute directory containing one canonical LiquiGen VAT bundle.
+        destination:
+          type: string
+          minLength: 7
+          description: New Content Browser folder under /Game.
+        asset_prefix:
+          type: string
+          pattern: "^[A-Za-z][A-Za-z0-9_]{1,63}$"
+        source_kind:
+          type: string
+          const: liquigen_export
+    output_schema:
+      type: object
+    call_examples:
+      - arguments:
+          source_directory: "C:/dcc-mcp/exports/liquigen-chain-vat"
+          destination: "/Game/LiquiGen/VAT/ChainBurst"
+          asset_prefix: "LiquiGen_ChainBurst"
+          source_kind: liquigen_export
+        note: Stage a real LiquiGen Unreal VAT bundle using the SideFX fluid material function.
+    next-tools:
+      on-success: [unreal_liquigen_showcase__finalize_vat_bundle]
+      on-failure: [dcc_diagnostics__audit_log]
+
+  - name: finalize_vat_bundle
+    description: Finalize a staged LiquiGen fluid VAT bundle after one editor tick by binding and verifying material parameters, the mesh slot, and provenance.
+    source_file: scripts/finalize_vat_bundle.py
+    execution: sync
+    affinity: main
+    enforce_thread_affinity: true
+    timeout_hint_secs: 120
+    annotations:
+      read_only_hint: false
+      destructive_hint: false
+      idempotent_hint: true
+      open_world_hint: false
+    input_schema:
+      type: object
+      required: [source_directory, destination, asset_prefix, source_kind]
+      properties:
+        source_directory:
+          type: string
+          minLength: 3
+          description: Absolute directory used by the preceding import_vat_bundle call.
+        destination:
+          type: string
+          minLength: 7
+          description: Existing staged Content Browser folder under /Game.
+        asset_prefix:
+          type: string
+          pattern: "^[A-Za-z][A-Za-z0-9_]{1,63}$"
+        source_kind:
+          type: string
+          const: liquigen_export
+    output_schema:
+      type: object
+    call_examples:
+      - arguments:
+          source_directory: "C:/dcc-mcp/exports/liquigen-chain-vat"
+          destination: "/Game/LiquiGen/VAT/ChainBurst"
+          asset_prefix: "LiquiGen_ChainBurst"
+          source_kind: liquigen_export
+        note: Finalize the exact staged VAT bundle after the import call has returned.
+    next-tools:
+      on-success: [unreal_liquigen_showcase__stage_chain_burst]
+      on-failure: [dcc_diagnostics__audit_log]
+
+  - name: import_chain_burst
+    description: Import a PNG atlas and author a verified Texture2D, ParticleSubUV material, and multi-emitter Niagara chain burst.
+    source_file: scripts/import_chain_burst.py
+    execution: sync
+    affinity: main
+    enforce_thread_affinity: true
+    timeout_hint_secs: 180
+    annotations:
+      read_only_hint: false
+      destructive_hint: true
+      idempotent_hint: false
+      open_world_hint: false
+    input_schema:
+      type: object
+      required: [source_path, destination, asset_prefix, source_kind]
+      properties:
+        source_path:
+          type: string
+          minLength: 1
+          description: Absolute path to a PNG flipbook atlas.
+        destination:
+          type: string
+          minLength: 7
+          description: Content Browser folder under /Game.
+        asset_prefix:
+          type: string
+          pattern: "^[A-Za-z][A-Za-z0-9_]{1,63}$"
+        source_kind:
+          type: string
+          enum: [liquigen_export, synthetic_proxy]
+        columns:
+          type: integer
+          minimum: 1
+          maximum: 64
+          default: 8
+        rows:
+          type: integer
+          minimum: 1
+          maximum: 64
+          default: 8
+        chain_count:
+          type: integer
+          minimum: 2
+          maximum: 12
+          default: 5
+        delay_seconds:
+          type: number
+          minimum: 0.05
+          maximum: 2.0
+          default: 0.18
+        spacing_cm:
+          type: number
+          minimum: 1.0
+          maximum: 5000.0
+          default: 260.0
+    output_schema:
+      type: object
+    call_examples:
+      - arguments:
+          source_path: "C:/dcc-mcp/exports/liquigen-chain-atlas.png"
+          destination: "/Game/LiquiGen/Showcase"
+          asset_prefix: "LiquiGen_ChainBurst"
+          source_kind: liquigen_export
+          columns: 8
+          rows: 8
+          chain_count: 5
+          delay_seconds: 0.18
+          spacing_cm: 260.0
+        note: Import a real 8x8 LiquiGen atlas as a five-stage chain burst.
+    next-tools:
+      on-success: [unreal_liquigen_showcase__stage_chain_burst]
+      on-failure: [dcc_diagnostics__screenshot, dcc_diagnostics__audit_log]
+
+  - name: author_procedural_chain_burst
+    description: Author an Unreal-native multi-layer Niagara chain burst from a real LiquiGen project and VAT export bundle, preserving provenance and graph timing as asset metadata.
+    source_file: scripts/author_procedural_chain_burst.py
+    execution: sync
+    affinity: main
+    enforce_thread_affinity: true
+    timeout_hint_secs: 240
+    annotations:
+      read_only_hint: false
+      destructive_hint: true
+      idempotent_hint: false
+      open_world_hint: false
+    input_schema:
+      type: object
+      required: [source_project, source_directory, destination, asset_prefix]
+      properties:
+        source_project:
+          type: string
+          minLength: 3
+          description: Absolute path to the source .liquigen node project.
+        source_directory:
+          type: string
+          minLength: 3
+          description: Absolute directory containing its canonical FBX/EXR/JSON VAT export bundle.
+        destination:
+          type: string
+          minLength: 7
+          description: New Content Browser folder under /Game.
+        asset_prefix:
+          type: string
+          pattern: "^[A-Za-z][A-Za-z0-9_]{1,63}$"
+        chain_count:
+          type: integer
+          minimum: 2
+          maximum: 12
+          default: 5
+        delay_seconds:
+          type: number
+          minimum: 0.05
+          maximum: 2.0
+          default: 0.18
+        spacing_cm:
+          type: number
+          minimum: 1.0
+          maximum: 5000.0
+          default: 260.0
+        blast_diameter_cm:
+          type: number
+          minimum: 100.0
+          maximum: 5000.0
+          default: 600.0
+          description: Approximate world-space diameter of one procedural blast, independent from chain spacing.
+        particle_count:
+          type: integer
+          minimum: 4
+          maximum: 128
+          default: 28
+    output_schema:
+      type: object
+    call_examples:
+      - arguments:
+          source_project: "C:/dcc-mcp/projects/LiquiGen_ChainBurst.liquigen"
+          source_directory: "C:/dcc-mcp/exports/liquigen-chain-vat"
+          destination: "/Game/LiquiGen/Niagara/ProceduralChain"
+          asset_prefix: "LiquiGen_ChainBurst_Procedural"
+          chain_count: 5
+          delay_seconds: 0.18
+          spacing_cm: 260.0
+          particle_count: 28
+        note: Preserve the real LiquiGen source contract while using UE materials and Niagara for a clearer procedural showcase.
+    next-tools:
+      on-success: [unreal_liquigen_showcase__stage_chain_burst]
+      on-failure: [dcc_diagnostics__screenshot, dcc_diagnostics__audit_log]
+
+  - name: stage_chain_burst
+    description: Build or refresh a deterministic UE 5.8 showcase level, spawn the Niagara chain burst, and frame the editor viewport camera.
+    source_file: scripts/stage_chain_burst.py
+    execution: sync
+    affinity: main
+    enforce_thread_affinity: true
+    timeout_hint_secs: 120
+    annotations:
+      read_only_hint: false
+      destructive_hint: true
+      idempotent_hint: true
+      open_world_hint: false
+    input_schema:
+      type: object
+      required: [niagara_system_path, source_kind]
+      properties:
+        niagara_system_path:
+          type: string
+          minLength: 7
+        source_kind:
+          type: string
+          enum: [liquigen_export, synthetic_proxy]
+        level_path:
+          type: string
+          default: "/Game/LiquiGen/Showcase/L_LiquiGenChainBurstShowcase"
+        actor_label:
+          type: string
+          default: "LiquiGen_ChainBurst_Showcase"
+        effect_scale:
+          type: number
+          minimum: 0.1
+          maximum: 10.0
+          default: 1.0
+          description: Uniform actor transform scale; use blast_diameter_cm to resize world-space Niagara particles.
+    output_schema:
+      type: object
+    next-tools:
+      on-success: [unreal_liquigen_showcase__get_showcase_state, unreal_liquigen_showcase__replay_chain_burst]
+      on-failure: [dcc_diagnostics__screenshot, dcc_diagnostics__audit_log]
+
+  - name: replay_chain_burst
+    description: Restart the staged Niagara chain burst from its initial state for a deterministic capture take.
+    source_file: scripts/replay_chain_burst.py
+    execution: sync
+    affinity: main
+    enforce_thread_affinity: true
+    timeout_hint_secs: 30
+    annotations:
+      read_only_hint: false
+      destructive_hint: false
+      idempotent_hint: false
+      open_world_hint: false
+    input_schema:
+      type: object
+      properties:
+        actor_label:
+          type: string
+          default: "LiquiGen_ChainBurst_Showcase"
+    output_schema:
+      type: object
+
+  - name: get_showcase_state
+    description: Verify the current showcase level, Niagara actor binding, and source provenance.
+    source_file: scripts/get_showcase_state.py
+    execution: sync
+    affinity: main
+    enforce_thread_affinity: true
+    timeout_hint_secs: 30
+    annotations:
+      read_only_hint: true
+      destructive_hint: false
+      idempotent_hint: true
+      open_world_hint: false
+    input_schema:
+      type: object
+      properties:
+        actor_label:
+          type: string
+          default: "LiquiGen_ChainBurst_Showcase"
+    output_schema:
+      type: object

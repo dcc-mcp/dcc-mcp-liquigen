@@ -1,0 +1,11 @@
+[tools]
+python = "3.14.5"
+uv = "latest"
+just = "latest"
+
+[scripts]
+setup = "vx just sync"
+lint = "vx just lint"
+test = "vx just test"
+build = "vx just build"
+check = "vx just check"

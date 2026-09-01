@@ -1,0 +1,21 @@
+include LICENSE
+include README.md
+include CHANGELOG.md
+include CONTRIBUTING.md
+include SECURITY.md
+include install.md
+include justfile
+include vx.toml
+recursive-include docs *.md
+recursive-include packaging *.ps1
+recursive-include examples *.ini *.md *.py *.uproject
+recursive-include native CMakeLists.txt *.cpp *.h *.json *.md
+recursive-include src/dcc_mcp_liquigen/skills *.md *.py *.yaml
+recursive-include tests *.py
+prune .artifacts
+prune dist
+prune work
+prune videos
+global-exclude *.png *.jpg *.jpeg *.webp *.ico
+global-exclude *.dll *.exe *.pdb *.lib *.obj *.exp
+global-exclude *.liquigen *.fbx *.exr *.vdb *.abc *.uasset *.umap

@@ -1,0 +1,66 @@
+# Python environments and caches
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+coverage.xml
+htmlcov/
+*.egg-info/
+
+# Build and packaging output
+.artifacts/
+build/
+build-*/
+build_*/
+dist/
+wheelhouse/
+*.whl
+*.tar.gz
+*.zip
+
+# Native compiler output
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+CTestTestfile.cmake
+Testing/
+*.dll
+*.exe
+*.exp
+*.ilk
+*.lib
+*.obj
+*.pdb
+
+# Local LiquiGen inputs, vendor payloads, and generated DCC artifacts
+work/
+videos/
+presets_*/
+*.liquigen
+*.lic
+*.license
+*.fbx
+*.exr
+*.vdb
+*.abc
+*.uasset
+*.umap
+*.mp4
+*.mov
+screenshot.png
+
+# Local configuration and editor state
+.env
+.env.*
+!.env.example
+.idea/
+.vscode/
+*.user
+*.suo
+*.swp
+Thumbs.db
+.DS_Store
