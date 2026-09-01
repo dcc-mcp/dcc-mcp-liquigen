@@ -144,8 +144,12 @@ def test_vat_receiver_declares_sidefx_fluid_shader_and_lossless_texture_contract
     assert "TC_HDR" in source
     assert "TMGS_NO_MIPMAPS" in source
     assert '"srgb", False' in source
-    assert '"use_full_precision_u_vs", True' in source
+    assert '"use_full_precision_u_vs", False' in source
+    assert '"use_backwards_compatible_f16_trunc_u_vs", True' in source
+    assert '"generate_lightmap_u_vs", False' in source
     assert '"combine_meshes", True' in source
+    assert '"remove_degenerates", False' in source
+    assert '"generate_lightmap_u_vs", False' in source
     assert "StaticMeshEditorSubsystem" in source
     assert "get_lod_build_settings" in source
     assert "set_lod_build_settings" in source
@@ -157,7 +161,21 @@ def test_vat_receiver_declares_sidefx_fluid_shader_and_lossless_texture_contract
     assert "configure_material_instance_parameters" in source
     assert "get_material_instance_texture_parameter_value" in source
     assert "get_material_instance_scalar_parameter_value" in source
+    assert '"Game Time at First Frame"' in source
+    assert '"Auto Playback": True' in source
+    assert '"Support Legacy Parameters and Instancing": False' in source
+    assert '"Positions Require Two Textures": bundle["two_position_textures"]' in source
+    assert "set_material_instance_static_switch_parameter_value" in source
+    assert "get_material_instance_static_switch_parameter_value" in source
     assert "MP_CUSTOMIZED_UV" not in source
+    assert "BLEND_TRANSLUCENT" in source
+    assert "TLM_SURFACE_PER_PIXEL_LIGHTING" in source
+    assert "MaterialExpressionVectorParameter" in source
+    assert '"Water Tint"' in source
+    assert '"Water Roughness"' in source
+    assert '"Water Opacity"' in source
+    assert '"Water IOR"' in source
+    assert "MP_REFRACTION" in source
 
 
 def test_vat_receiver_native_result_fails_closed() -> None:
@@ -180,6 +198,44 @@ def test_vat_receiver_uses_the_four_argument_native_parameter_contract() -> None
 
     class MaterialEditingLibrary:
         @staticmethod
+        def get_scalar_parameter_names(_instance):
+            return [
+                "Houdini FPS",
+                "Bound Min X",
+                "Bound Min Y",
+                "Bound Min Z",
+                "Bound Max X",
+                "Bound Max Y",
+                "Bound Max Z",
+                "Playback Speed",
+                "Game Time at First Frame",
+            ]
+
+        @staticmethod
+        def get_texture_parameter_names(_instance):
+            return ["Lookup Table", "Position Texture", "Rotation Texture"]
+
+        @staticmethod
+        def get_static_switch_parameter_names(_instance):
+            return [
+                "Auto Playback",
+                "Support Legacy Parameters and Instancing",
+                "Positions Require Two Textures",
+            ]
+
+        @staticmethod
+        def set_material_instance_static_switch_parameter_value(_instance, _parameter, _value):
+            return True
+
+        @staticmethod
+        def get_material_instance_static_switch_parameter_value(_instance, parameter):
+            return parameter != "Positions Require Two Textures"
+
+        @staticmethod
+        def update_material_instance(_instance):
+            return None
+
+        @staticmethod
         def get_material_instance_texture_parameter_value(_instance, _parameter):
             return object()
 
@@ -196,7 +252,7 @@ def test_vat_receiver_uses_the_four_argument_native_parameter_contract() -> None
                     "success": True,
                     "saved": True,
                     "verified": True,
-                    "scalar_parameter_count": 8,
+                    "scalar_parameter_count": 9,
                     "texture_parameter_count": 3,
                     "package_dirty": False,
                 }
@@ -205,8 +261,14 @@ def test_vat_receiver_uses_the_four_argument_native_parameter_contract() -> None
     class Unreal:
         pass
 
+    class EditorAssetLibrary:
+        @staticmethod
+        def save_loaded_asset(_instance, only_if_is_dirty=False):
+            return not only_if_is_dirty
+
     Unreal.DccMcpAutomationLibrary = NativeBridge
     Unreal.MaterialEditingLibrary = MaterialEditingLibrary
+    Unreal.EditorAssetLibrary = EditorAssetLibrary
 
     with pytest.raises(RuntimeError, match="texture parameter failed readback"):
         vat._bind_material_instance(
@@ -215,6 +277,8 @@ def test_vat_receiver_uses_the_four_argument_native_parameter_contract() -> None
             {"lookup": object(), "position": object(), "rotation": object()},
             {
                 "source_fps": 60.0,
+                "frame_count": 64,
+                "two_position_textures": False,
                 "bounds_min": [-1.0, -2.0, -3.0],
                 "bounds_max": [1.0, 2.0, 3.0],
             },
@@ -352,6 +416,39 @@ def test_showcase_stage_exposes_and_verifies_effect_scale() -> None:
     assert "effect_scale=[" in source
 
 
+def test_water_vat_stage_is_bounds_driven_and_uses_the_finalized_material() -> None:
+    tools = (SKILL / "tools.yaml").read_text(encoding="utf-8")
+    source = (SKILL / "scripts" / "stage_water_vat.py").read_text(encoding="utf-8")
+
+    assert "name: stage_water_vat" in tools
+    assert (
+        "required: [source_directory, static_mesh_path, material_instance_path, source_kind]"
+        in tools
+    )
+    assert "canonical_vat_bundle" in source
+    assert "bounds_min" in source and "bounds_max" in source
+    assert "set_static_mesh" in source
+    assert "set_material(0, material)" in source
+    assert 'camera.set_editor_property("auto_activate_for_player"' in source
+
+
+def test_water_vat_preview_exposes_fixed_frame_and_auto_playback_controls() -> None:
+    tools = (SKILL / "tools.yaml").read_text(encoding="utf-8")
+    source = (SKILL / "scripts" / "configure_water_vat_preview.py").read_text(encoding="utf-8")
+
+    assert "name: configure_water_vat_preview" in tools
+    assert "auto_playback:" in tools
+    assert "support_legacy_parameters:" in tools
+    assert "display_frame:" in tools
+    assert '"Auto Playback"' in source
+    assert '"Support Legacy Parameters and Instancing"' in source
+    assert '"Display Frame"' in source
+    assert '"Water Opacity"' in source
+    assert "set_material_instance_static_switch_parameter_value" in source
+    assert "set_material_instance_scalar_parameter_value" in source
+    assert "save_loaded_asset" in source
+
+
 def test_effect_scale_validation_is_independent_from_chain_spacing() -> None:
     common = _common_module()
 
@@ -359,6 +456,44 @@ def test_effect_scale_validation_is_independent_from_chain_spacing() -> None:
     for value in (0.0, 0.09, 10.01, 100.0):
         with pytest.raises(ValueError, match="effect_scale"):
             common.effect_scale(value)
+
+
+def test_procedural_water_cascade_is_a_first_class_liquigen_receiver() -> None:
+    tools = (SKILL / "tools.yaml").read_text(encoding="utf-8")
+    author = SKILL / "scripts" / "author_procedural_water_cascade.py"
+    stage = SKILL / "scripts" / "stage_water_cascade.py"
+
+    assert "name: author_procedural_water_cascade" in tools
+    assert "name: stage_water_cascade" in tools
+    assert author.is_file()
+    assert stage.is_file()
+    author_source = author.read_text(encoding="utf-8")
+    stage_source = stage.read_text(encoding="utf-8")
+    assert "create_procedural_water_system" in author_source
+    assert 'source_kind = "liquigen_export"' in author_source
+    assert '"LiquiGen.Appearance", "unreal_procedural_water"' in author_source
+    assert '"LiquiGen_WaterCascade_Showcase"' in stage_source
+    assert "NiagaraComponent" in stage_source
+
+
+def test_water_cascade_layout_descends_and_exposes_three_layers() -> None:
+    common = _common_module()
+    offsets = common.water_cascade_offsets(5, 260.0, 180.0)
+    layers = common.procedural_water_layer_specs(520.0)
+
+    assert len(offsets) == 5
+    assert all(offsets[index][2] > offsets[index + 1][2] for index in range(4))
+    assert [layer[0] for layer in layers] == ["Sheet", "Foam", "Droplets"]
+
+
+def test_replay_supports_pie_world_and_capture_pawn_suppression() -> None:
+    tools = (SKILL / "tools.yaml").read_text(encoding="utf-8")
+    source = (SKILL / "scripts" / "replay_chain_burst.py").read_text(encoding="utf-8")
+
+    assert "hide_default_pawn:" in tools
+    assert "get_game_world" in source
+    assert "GameplayStatics.get_all_actors_of_class" in source
+    assert "set_actor_hidden_in_game(True)" in source
 
 
 def test_procedural_blast_diameter_is_independent_and_drives_every_layer() -> None:

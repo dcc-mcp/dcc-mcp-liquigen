@@ -5,7 +5,12 @@ from __future__ import annotations
 import struct
 from pathlib import Path
 
-from _showcase_common import chain_offsets, procedural_layer_specs
+from _showcase_common import (
+    chain_offsets,
+    procedural_layer_specs,
+    procedural_water_layer_specs,
+    water_cascade_offsets,
+)
 
 
 def png_dimensions(path: Path) -> tuple[int, int]:
@@ -314,6 +319,156 @@ def create_procedural_chain_system(
     context.finalize()
     if not unreal.EditorAssetLibrary.save_loaded_asset(system, only_if_is_dirty=False):
         raise RuntimeError("failed to save procedural Niagara system")
+    return system
+
+
+def create_procedural_water_system(
+    unreal,
+    materials: dict[str, object],
+    destination: str,
+    name: str,
+    chain: dict[str, float | int],
+    splash_diameter_cm: float,
+    particle_count: int,
+    vertical_drop_cm: float,
+):
+    """Author a descending three-layer water cascade from LiquiGen graph timing."""
+    system = unreal.AssetToolsHelpers.get_asset_tools().create_asset(
+        name, destination, unreal.NiagaraSystem, unreal.NiagaraSystemFactoryNew()
+    )
+    if system is None:
+        raise RuntimeError(f"failed to create Niagara system: {destination}/{name}")
+    fx = unreal.FXConverterUtilitiesLibrary
+    context = fx.create_system_conversion_context(system)
+    offsets = water_cascade_offsets(
+        int(chain["count"]), float(chain["spacing_cm"]), vertical_drop_cm
+    )
+    layers = procedural_water_layer_specs(splash_diameter_cm)
+    for stage, (x, y, z) in enumerate(offsets):
+        direction = -1.0 if stage % 2 else 1.0
+        for (
+            layer_name,
+            material_key,
+            lifetime,
+            sprite_size,
+            box_size,
+            velocity,
+            count_scale,
+        ) in layers:
+            emitter = context.add_empty_emitter(f"LiquiGenWater{layer_name}{stage + 1:02d}")
+            emitter.set_local_space(False)
+            _configure_infinite_emitter(unreal, fx, emitter)
+            spawn = _module(
+                unreal,
+                fx,
+                emitter,
+                "SpawnBurstInstantaneous",
+                "/Niagara/Modules/Emitter/SpawnBurst_Instantaneous.SpawnBurst_Instantaneous",
+                unreal.ScriptExecutionCategory.EMITTER_UPDATE,
+            )
+            spawn.set_parameter(
+                "Spawn Count", fx.create_script_input_int(int(particle_count * count_scale))
+            )
+            spawn.set_parameter(
+                "Spawn Time", fx.create_script_input_float(stage * float(chain["delay_seconds"]))
+            )
+            initialize = _module(
+                unreal,
+                fx,
+                emitter,
+                "InitializeParticle",
+                "/Niagara/Modules/Spawn/Initialization/V2/InitializeParticle.InitializeParticle",
+                unreal.ScriptExecutionCategory.PARTICLE_SPAWN,
+            )
+            initialize.set_parameter("Lifetime", fx.create_script_input_float(lifetime))
+            initialize.set_parameter(
+                "Sprite Size Mode",
+                fx.create_script_input_enum(
+                    "/Niagara/Enums/ENiagara_SizeScaleMode.ENiagara_SizeScaleMode",
+                    "Non-Uniform",
+                ),
+            )
+            initialize.set_parameter(
+                "Sprite Size",
+                fx.create_script_input_vec2(unreal.Vector2D(*sprite_size)),
+                True,
+                True,
+            )
+            shape = _module(
+                unreal,
+                fx,
+                emitter,
+                "ShapeLocation",
+                "/Niagara/Modules/Spawn/Location/V2/ShapeLocation.ShapeLocation",
+                unreal.ScriptExecutionCategory.PARTICLE_SPAWN,
+            )
+            shape.set_parameter(
+                "Shape Primitive",
+                fx.create_script_input_enum(
+                    "/Niagara/Enums/Location/ENiagara_LocationShapes.ENiagara_LocationShapes",
+                    "Box",
+                ),
+            )
+            shape.set_parameter("Box Size", fx.create_script_input_vector(unreal.Vector(*box_size)))
+            offset = _module(
+                unreal,
+                fx,
+                emitter,
+                "AddVectorToPosition",
+                "/CascadeToNiagaraConverter/NiagaraScripts/ModuleScripts/AddVectorToPosition.AddVectorToPosition",
+                unreal.ScriptExecutionCategory.PARTICLE_SPAWN,
+            )
+            offset.set_parameter("Vector", fx.create_script_input_vector(unreal.Vector(x, y, z)))
+            add_velocity = _module(
+                unreal,
+                fx,
+                emitter,
+                "AddVelocity",
+                "/Niagara/Modules/Spawn/Velocity/AddVelocity.AddVelocity",
+                unreal.ScriptExecutionCategory.PARTICLE_SPAWN,
+            )
+            add_velocity.set_parameter(
+                "Velocity",
+                fx.create_script_input_vector(
+                    unreal.Vector(direction * velocity[0], velocity[1], velocity[2])
+                ),
+            )
+            gravity = _module(
+                unreal,
+                fx,
+                emitter,
+                "GravityForce",
+                "/Niagara/Modules/Update/Forces/GravityForce.GravityForce",
+                unreal.ScriptExecutionCategory.PARTICLE_UPDATE,
+            )
+            gravity.set_parameter(
+                "Gravity", fx.create_script_input_vector(unreal.Vector(0.0, 0.0, -980.0))
+            )
+            _module(
+                unreal,
+                fx,
+                emitter,
+                "ParticleState",
+                "/Niagara/Modules/Update/Lifetime/ParticleState.ParticleState",
+                unreal.ScriptExecutionCategory.PARTICLE_UPDATE,
+            )
+            _module(
+                unreal,
+                fx,
+                emitter,
+                "SolveForcesAndVelocity",
+                "/Niagara/Modules/Solvers/SolveForcesAndVelocity.SolveForcesAndVelocity",
+                unreal.ScriptExecutionCategory.PARTICLE_UPDATE,
+            )
+            renderer = unreal.NiagaraSpriteRendererProperties()
+            renderer.set_editor_property("material", materials[material_key])
+            renderer.set_editor_property("facing_mode", unreal.NiagaraSpriteFacingMode.FACE_CAMERA)
+            renderer.set_editor_property("cast_shadows", False)
+            emitter.add_renderer(f"LiquiGenWater{layer_name}Renderer{stage + 1:02d}", renderer)
+    context.set_warmup_tick_delta(1.0 / 60.0)
+    context.finalize()
+    if not unreal.EditorAssetLibrary.save_loaded_asset(system, only_if_is_dirty=False):
+        raise RuntimeError("failed to save procedural water Niagara system")
     return system
 
 

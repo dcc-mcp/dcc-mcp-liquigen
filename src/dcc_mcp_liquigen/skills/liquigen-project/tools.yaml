@@ -62,6 +62,8 @@ tools:
             - project_save
             - play_timeline
             - pause_timeline
+            - reset_simulation
+            - reset_timeline
             - export_all
             - export_selected
             - open_command_palette

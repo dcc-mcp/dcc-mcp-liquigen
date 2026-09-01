@@ -17,6 +17,8 @@ HOST_COMMANDS = (
     "project_save",
     "play_timeline",
     "pause_timeline",
+    "reset_simulation",
+    "reset_timeline",
     "export_all",
     "export_selected",
     "open_command_palette",
@@ -40,10 +42,14 @@ GRAPH_SCOPED_COMMANDS = frozenset(
         "center_graph_on_selection",
     }
 )
-CONSUMER_ACKNOWLEDGED_COMMANDS = GRAPH_SCOPED_COMMANDS | frozenset(
+CONSUMER_ACKNOWLEDGED_COMMANDS = (
+    GRAPH_SCOPED_COMMANDS - {"export_all", "export_selected"}
+) | frozenset(
     {
         "play_timeline",
         "pause_timeline",
+        "reset_simulation",
+        "reset_timeline",
         "show_project_palette",
         "return_to_project",
     }

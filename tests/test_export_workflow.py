@@ -49,6 +49,10 @@ def test_run_export_workflow_uses_semantic_commands_and_requires_fresh_bundle(
         "dcc_mcp_liquigen.export_workflow._configured_export_directories",
         lambda _project, _roots: [str(output)],
     )
+    monkeypatch.setattr(
+        "dcc_mcp_liquigen.export_workflow._required_export_bundle_type",
+        lambda _project, _roots: None,
+    )
 
     def command_runner(command, **arguments):
         calls.append((command, arguments))
@@ -78,8 +82,11 @@ def test_run_export_workflow_uses_semantic_commands_and_requires_fresh_bundle(
     assert [item[0] for item in calls] == [
         "open_project_path",
         "reset_graph_zoom",
+        "reset_simulation",
+        "reset_timeline",
         "play_timeline",
         "pause_timeline",
+        "switch_tab_to_export",
         "export_all",
     ]
     assert calls[0][1]["project_path"] == str(project.resolve())
@@ -124,4 +131,42 @@ def test_run_export_workflow_rejects_unconfigured_directory(monkeypatch, tmp_pat
             str(output),
             binding=_binding(),
             roots=[tmp_path],
+        )
+
+
+def test_run_export_workflow_does_not_accept_flipbook_when_vat_is_enabled(
+    monkeypatch, tmp_path: Path
+):
+    project = tmp_path / "water.liquigen"
+    project.write_bytes(b"project")
+    output = tmp_path / "export"
+    output.mkdir()
+    monkeypatch.setattr(
+        "dcc_mcp_liquigen.export_workflow._configured_export_directories",
+        lambda _project, _roots: [str(output)],
+    )
+    monkeypatch.setattr(
+        "dcc_mcp_liquigen.export_workflow._required_export_bundle_type",
+        lambda _project, _roots: "liquigen_vat",
+    )
+
+    def command_runner(command, **_arguments):
+        if command == "export_all":
+            _png(output / "water.png")
+        return {"success": True, "command": command, "status": "consumed"}
+
+    clock = _Clock()
+    with pytest.raises(LiquiGenExportWorkflowError, match="expected liquigen_vat"):
+        run_export_workflow(
+            str(project),
+            str(output),
+            simulate_seconds=0,
+            timeout_seconds=1.0,
+            stable_seconds=0.5,
+            poll_interval_seconds=0.25,
+            binding=_binding(),
+            roots=[tmp_path],
+            command_runner=command_runner,
+            sleep=clock.sleep,
+            monotonic=clock.monotonic,
         )

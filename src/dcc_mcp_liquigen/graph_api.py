@@ -240,8 +240,12 @@ def _resolve_selector(selector: Any, aliases: dict[str, int]) -> int:
         raise LiquiGenGraphApiError("node selector must be an integer ID or transaction alias")
     if isinstance(selector, int):
         return selector
-    if isinstance(selector, str) and selector in aliases:
-        return aliases[selector]
+    if isinstance(selector, str):
+        if selector in aliases:
+            return aliases[selector]
+        digits = selector[1:] if selector.startswith("-") else selector
+        if digits and digits.isascii() and digits.isdigit():
+            return int(selector)
     raise LiquiGenGraphApiError(f"unknown node selector: {selector!r}")
 
 
@@ -609,6 +613,18 @@ def prepare_unreal_water_project(
         "vat_max_texture_width",
     }
     available_parameters = {item["name"] for item in mesh_schema["parameters"]}
+    image_schema = schemas.get("Node_Export_Image")
+    if image_schema is None:
+        raise LiquiGenGraphApiError(
+            "installed LiquiGen version does not expose Node_Export_Image in official projects"
+        )
+    available_image_parameters = {item["name"] for item in image_schema["parameters"]}
+    missing_image_parameters = sorted({"directory", "filename"} - available_image_parameters)
+    if missing_image_parameters:
+        raise LiquiGenGraphApiError(
+            "installed LiquiGen version is missing paired image export parameters: "
+            + ", ".join(missing_image_parameters)
+        )
     missing_parameters = sorted(required_parameters - available_parameters)
     if missing_parameters:
         raise LiquiGenGraphApiError(
@@ -667,15 +683,33 @@ def prepare_unreal_water_project(
                 "value": "Unreal",
             }
         )
-    operations.extend(
-        {
-            "op": "set_node_state",
-            "node": int(_plain_field(image_export, "id")),
-            "disabled": True,
-            "on": True,
+    for image_export in image_exports:
+        image_export_id = int(_plain_field(image_export, "id"))
+        operations.append(
+            {
+                "op": "set_node_state",
+                "node": image_export_id,
+                "disabled": False,
+                "on": True,
+            }
+        )
+        paired_image_parameters: dict[str, Any] = {
+            "directory": str(export_path),
+            "filename": f"{asset_name}_$(safename)",
         }
-        for image_export in image_exports
-    )
+        if "first_frame" in available_image_parameters:
+            paired_image_parameters["first_frame"] = 0.0
+        if "unbounded_num_frames" in available_image_parameters:
+            paired_image_parameters["unbounded_num_frames"] = float(frame_count)
+        operations.extend(
+            {
+                "op": "set_parameter",
+                "node": image_export_id,
+                "name": name,
+                "value": value,
+            }
+            for name, value in paired_image_parameters.items()
+        )
     operations.extend(
         [
             {
@@ -732,6 +766,7 @@ def prepare_unreal_water_project(
         "frame_count": int(frame_count),
         "output_directory": str(export_path),
         "appearance_preserved": True,
+        "paired_image_export_enabled": True,
         "derived_project_writable": True,
         "vat_target_engine": "Unreal",
         "vat_target_engine_parameter_available": target_engine_parameter_available,

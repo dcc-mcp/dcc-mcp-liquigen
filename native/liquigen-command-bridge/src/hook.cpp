@@ -13,6 +13,10 @@ namespace {
 
 constexpr std::ptrdiff_t kUiContextOffset = 0x18;
 constexpr std::ptrdiff_t kTriggeredCommandsOffset = 0x188;
+constexpr std::ptrdiff_t kGraphItemsOffset = 0x08;
+constexpr std::ptrdiff_t kGraphItemCountOffset = 0x10;
+constexpr std::ptrdiff_t kGraphItemStateOffset = 0x20;
+constexpr std::ptrdiff_t kGraphItemActiveOffset = 0xDA;
 constexpr std::size_t kMaximumImageBytes = 512ULL * 1024ULL * 1024ULL;
 constexpr std::size_t kGraphFunctionPatchBytes = 19;
 constexpr std::size_t kProjectFramePatchBytes = 17;
@@ -25,12 +29,6 @@ constexpr unsigned char kAppStatePattern[] = {
     0x48, 0x89, 0xF2,
 };
 constexpr char kAppStateMask[] = "xxx????xxxxxxxxxxx";
-
-constexpr unsigned char kGraphFunctionPattern[] = {
-    0x41, 0x56, 0x56, 0x57, 0x55, 0x53, 0x48, 0x81, 0xEC, 0x20,
-    0x01, 0x00, 0x00, 0x4C, 0x89, 0xC6, 0x48, 0x89, 0xD3,
-};
-constexpr char kGraphFunctionMask[] = "xxxxxxxxxxxxxxxxxxx";
 
 constexpr unsigned char kGraphConsumerPattern[] = {
     0x41, 0x57, 0x41, 0x56, 0x41, 0x55, 0x41, 0x54, 0x56, 0x57,
@@ -67,12 +65,12 @@ constexpr unsigned char kProjectPaletteStatePattern[] = {
 };
 constexpr char kProjectPaletteStateMask[] = "xxxxxx????xxxx????";
 
-using GraphFunction = void (*)(void*, void*, void*);
+using GraphConsumerFunction = void (*)(void*, void*, void*, void*);
 using ProjectFrameFunction = void (*)(void*, void*, void*);
 using ProjectLoadFunction = bool (*)(const OdinString*, void*);
 
 unsigned char* g_graph_function = nullptr;
-GraphFunction g_graph_trampoline = nullptr;
+GraphConsumerFunction g_graph_trampoline = nullptr;
 unsigned char g_graph_original[kGraphFunctionPatchBytes]{};
 unsigned char* g_graph_command_guard = nullptr;
 volatile LONG g_graph_command_id = 0;
@@ -81,6 +79,8 @@ const char* g_graph_command_data = nullptr;
 std::size_t g_graph_command_size = 0;
 ULONGLONG g_graph_deadline = 0;
 LONG g_graph_attempts = 0;
+std::uint32_t g_graph_item_count = 0;
+std::uint32_t g_active_graph_item_count = 0;
 volatile LONG64* g_graph_layout = nullptr;
 LONG64 g_graph_previous_layout = 0;
 HWND g_graph_window = nullptr;
@@ -148,6 +148,45 @@ bool IsUsableCommandSet(CommandSet* command_set) noexcept {
                reinterpret_cast<void*>(table_base),
                capacity * (sizeof(OdinString) + sizeof(std::uint64_t) * 2),
                true);
+}
+
+void ObserveGraphItems(void* graph) noexcept {
+    g_graph_item_count = 0;
+    g_active_graph_item_count = 0;
+    auto* graph_bytes = static_cast<unsigned char*>(graph);
+    if (!IsMapped(
+            graph_bytes,
+            kGraphItemCountOffset + sizeof(std::int64_t),
+            false)) {
+        return;
+    }
+    const auto count = *reinterpret_cast<const std::int64_t*>(
+        graph_bytes + kGraphItemCountOffset);
+    if (count < 0 || count > 4096) {
+        return;
+    }
+    g_graph_item_count = static_cast<std::uint32_t>(count);
+    if (count == 0) {
+        return;
+    }
+    auto** items = *reinterpret_cast<unsigned char***>(
+        graph_bytes + kGraphItemsOffset);
+    if (!IsMapped(items, static_cast<std::size_t>(count) * sizeof(void*), false)) {
+        g_graph_item_count = 0;
+        return;
+    }
+    for (std::int64_t index = 0; index < count; ++index) {
+        auto* item = items[index];
+        if (!IsMapped(item, kGraphItemStateOffset + sizeof(void*), false)) {
+            continue;
+        }
+        auto* state = *reinterpret_cast<unsigned char**>(
+            item + kGraphItemStateOffset);
+        if (IsMapped(state, kGraphItemActiveOffset + 1, false) &&
+            state[kGraphItemActiveOffset] != 0) {
+            ++g_active_graph_item_count;
+        }
+    }
 }
 
 bool GetLiquiGenModule(ModuleView* result) noexcept {
@@ -313,21 +352,6 @@ CommandSet* FindTriggeredCommandSet(const ModuleView& module) noexcept {
     return IsUsableCommandSet(command_set) ? command_set : nullptr;
 }
 
-bool IsGraphScoped(CommandId id) noexcept {
-    switch (id) {
-        case CommandId::kExportAll:
-        case CommandId::kExportSelected:
-        case CommandId::kPlayTimeline:
-        case CommandId::kPauseTimeline:
-        case CommandId::kCenterGraph:
-        case CommandId::kResetGraphZoom:
-        case CommandId::kCenterGraphOnSelection:
-            return true;
-        default:
-            return false;
-    }
-}
-
 bool IsProjectPaletteStateCommand(CommandId id) noexcept {
     return id == CommandId::kShowProjectPalette || id == CommandId::kReturnToProject;
 }
@@ -373,7 +397,9 @@ void PublishBridgeStatus(
     CommandId id,
     std::uint64_t nonce,
     BridgeStatus status,
-    std::uint32_t attempts) noexcept {
+    std::uint32_t attempts,
+    std::uint32_t graph_item_count = 0,
+    std::uint32_t active_graph_item_count = 0) noexcept {
     if (id == CommandId::kInvalid || nonce == 0) {
         return;
     }
@@ -389,6 +415,8 @@ void PublishBridgeStatus(
             if (state->magic == kBridgeMagic && state->abi_version == kBridgeAbiVersion &&
                 state->command_id == static_cast<std::uint32_t>(id)) {
                 state->reserved = attempts;
+                state->graph_item_count = graph_item_count;
+                state->active_graph_item_count = active_graph_item_count;
                 InterlockedExchange(&state->status, static_cast<LONG>(status));
             }
             UnmapViewOfFile(state);
@@ -461,12 +489,19 @@ void CompleteGraphDispatch(BridgeStatus status) noexcept {
     }
     RestoreGraphDetour();
     PublishBridgeStatus(
-        id, nonce, status, static_cast<std::uint32_t>(g_graph_attempts));
+        id,
+        nonce,
+        status,
+        static_cast<std::uint32_t>(g_graph_attempts),
+        g_graph_item_count,
+        g_active_graph_item_count);
     g_graph_nonce = 0;
     g_graph_command_data = nullptr;
     g_graph_command_size = 0;
     g_graph_deadline = 0;
     g_graph_attempts = 0;
+    g_graph_item_count = 0;
+    g_active_graph_item_count = 0;
     g_graph_command_set = nullptr;
     g_graph_inserted = false;
 }
@@ -677,16 +712,18 @@ BridgeStatus BeginProjectOpen(
 void GraphDispatchHook(
     void* ui_context,
     void* graph,
+    void* auxiliary,
     void* frame) noexcept {
     const auto original = g_graph_trampoline;
     const auto id = static_cast<CommandId>(g_graph_command_id);
     if (original == nullptr || id == CommandId::kInvalid) {
         if (original != nullptr) {
-            original(ui_context, graph, frame);
+            original(ui_context, graph, auxiliary, frame);
         }
         return;
     }
     BridgeStatus dispatch_status = BridgeStatus::kPending;
+    ObserveGraphItems(graph);
     auto* frame_bytes = static_cast<unsigned char*>(ui_context);
     auto* frame_command_set = IsMapped(
                                   frame_bytes,
@@ -716,15 +753,31 @@ void GraphDispatchHook(
         }
     }
 
-    original(ui_context, graph, frame);
+    original(ui_context, graph, auxiliary, frame);
     if (dispatch_status != BridgeStatus::kPending) {
         CompleteGraphDispatch(dispatch_status);
         return;
     }
-    if (g_graph_command_set != nullptr &&
-        !ContainsCommand(g_graph_command_set, HostCommandName(id))) {
+    const auto consumed = g_graph_command_set != nullptr &&
+                          !ContainsCommand(g_graph_command_set, HostCommandName(id));
+    if (ShouldCompleteGraphDispatch(id, consumed, g_graph_item_count)) {
         CompleteGraphDispatch(BridgeStatus::kConsumed);
         return;
+    }
+    if (consumed) {
+        const auto insertion = InsertCommand(
+            frame_command_set,
+            g_graph_command_data,
+            g_graph_command_size);
+        if (insertion != InsertResult::kInserted &&
+            insertion != InsertResult::kAlreadyPresent) {
+            CompleteGraphDispatch(
+                insertion == InsertResult::kFull ? BridgeStatus::kMapFull
+                                                  : BridgeStatus::kMapUnavailable);
+            return;
+        }
+        g_graph_command_set = frame_command_set;
+        g_graph_inserted = insertion == InsertResult::kInserted;
     }
     ++g_graph_attempts;
     if (g_graph_attempts >= 240 || GetTickCount64() >= g_graph_deadline) {
@@ -746,12 +799,6 @@ BridgeStatus BeginGraphDispatch(
     auto* target = FindPattern(
         module.text,
         module.text_size,
-        kGraphFunctionPattern,
-        kGraphFunctionMask,
-        sizeof(kGraphFunctionPattern));
-    auto* consumer = FindPattern(
-        module.text,
-        module.text_size,
         kGraphConsumerPattern,
         kGraphConsumerMask,
         sizeof(kGraphConsumerPattern));
@@ -759,12 +806,12 @@ BridgeStatus BeginGraphDispatch(
     const auto* literal = FindCommandLiteral(module, command);
     auto* command_set = FindTriggeredCommandSet(module);
     auto* layout = FindGraphLayoutSlot(module);
-    if (target == nullptr || consumer == nullptr || literal == nullptr || layout == nullptr ||
+    if (target == nullptr || literal == nullptr || layout == nullptr ||
         command_set == nullptr) {
         InterlockedExchange(&g_graph_command_id, 0);
         return BridgeStatus::kProfileMismatch;
     }
-    auto* command_guard = consumer + kGraphCommandGuardOffset;
+    auto* command_guard = target + kGraphCommandGuardOffset;
     constexpr unsigned char kExpectedGuard[] = {0x84, 0xDB, 0x74, 0x0F};
     if (std::memcmp(command_guard, kExpectedGuard, sizeof(kExpectedGuard)) != 0) {
         InterlockedExchange(&g_graph_command_id, 0);
@@ -809,7 +856,7 @@ BridgeStatus BeginGraphDispatch(
     std::memcpy(cursor + 2, &continuation, sizeof(continuation));
     cursor[10] = 0xFF;
     cursor[11] = 0xE0;
-    g_graph_trampoline = reinterpret_cast<GraphFunction>(trampoline);
+    g_graph_trampoline = reinterpret_cast<GraphConsumerFunction>(trampoline);
     g_graph_function = target;
     g_graph_command_guard = command_guard;
     g_graph_layout = layout;
@@ -952,7 +999,7 @@ void ProcessBridgeMessage(HWND window, CommandId id, std::uint64_t nonce) noexce
                 return;
             }
             InterlockedExchange(&state->status, static_cast<LONG>(status));
-        } else if (IsGraphScoped(id)) {
+        } else if (UsesGraphDispatch(id)) {
             ModuleView module{};
             const auto status = GetLiquiGenModule(&module)
                                     ? BeginGraphDispatch(module, id, nonce, window)

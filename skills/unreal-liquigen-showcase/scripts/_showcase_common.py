@@ -109,3 +109,70 @@ def chain_offsets(count: int, spacing_cm: float) -> list[tuple[float, float, flo
         )
         for stage in range(int(config["count"]))
     ]
+
+
+def water_cascade_offsets(
+    count: int, spacing_cm: float, vertical_drop_cm: float
+) -> list[tuple[float, float, float]]:
+    """Lay out a descending, slightly staggered cascade from LiquiGen stage timing."""
+    config = chain_config(count, 0.18, spacing_cm)
+    vertical_drop = float(vertical_drop_cm)
+    if vertical_drop < 25.0 or vertical_drop > 2000.0:
+        raise ValueError("vertical_drop_cm must be between 25 and 2000")
+    midpoint = (int(config["count"]) - 1) / 2.0
+    spacing = float(config["spacing_cm"])
+    return [
+        (
+            (stage - midpoint) * spacing,
+            (1.0 if stage % 2 else -1.0) * spacing * 0.14,
+            (int(config["count"]) - 1 - stage) * vertical_drop,
+        )
+        for stage in range(int(config["count"]))
+    ]
+
+
+def procedural_water_layer_specs(
+    splash_diameter_cm: float,
+) -> tuple[
+    tuple[
+        str,
+        str,
+        float,
+        tuple[float, float],
+        tuple[float, float, float],
+        tuple[float, float, float],
+        float,
+    ],
+    ...,
+]:
+    """Describe the sheet, foam, and droplet layers of one procedural splash."""
+    diameter = blast_diameter(splash_diameter_cm)
+    return (
+        (
+            "Sheet",
+            "sheet",
+            1.55,
+            (diameter * 0.12, diameter * 0.42),
+            (diameter * 0.12, diameter * 0.10, diameter * 0.06),
+            (diameter * 0.12, 0.0, -diameter * 0.38),
+            0.35,
+        ),
+        (
+            "Foam",
+            "foam",
+            0.85,
+            (diameter * 0.09, diameter * 0.09),
+            (diameter * 0.20, diameter * 0.18, diameter * 0.06),
+            (diameter * 0.28, 0.0, diameter * 0.48),
+            0.65,
+        ),
+        (
+            "Droplets",
+            "droplets",
+            1.10,
+            (diameter * 0.025, diameter * 0.12),
+            (diameter * 0.30, diameter * 0.28, diameter * 0.10),
+            (diameter * 0.50, diameter * 0.08, diameter * 0.72),
+            1.4,
+        ),
+    )

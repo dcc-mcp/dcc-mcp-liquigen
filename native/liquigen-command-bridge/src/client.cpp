@@ -183,24 +183,6 @@ const char* StatusName(BridgeStatus status) noexcept {
     return "unknown";
 }
 
-bool RequiresConsumerAcknowledgement(CommandId id) noexcept {
-    switch (id) {
-        case CommandId::kExportAll:
-        case CommandId::kExportSelected:
-        case CommandId::kPlayTimeline:
-        case CommandId::kPauseTimeline:
-        case CommandId::kCenterGraph:
-        case CommandId::kResetGraphZoom:
-        case CommandId::kCenterGraphOnSelection:
-        case CommandId::kProjectOpenPath:
-        case CommandId::kShowProjectPalette:
-        case CommandId::kReturnToProject:
-            return true;
-        default:
-            return false;
-    }
-}
-
 int EmitFailure(const char* error, DWORD win32_error) noexcept {
     std::printf(
         "{\"success\":false,\"error\":\"%s\",\"win32_error\":%lu}\n",
@@ -337,6 +319,8 @@ int wmain(int argc, wchar_t** argv) {
     }
     const auto status = static_cast<BridgeStatus>(state->status);
     const auto graph_attempts = state->reserved;
+    const auto graph_item_count = state->graph_item_count;
+    const auto active_graph_item_count = state->active_graph_item_count;
     const auto accepted = status == BridgeStatus::kConsumed ||
                           (!RequiresConsumerAcknowledgement(arguments.command) &&
                            (status == BridgeStatus::kInjected ||
@@ -354,6 +338,7 @@ int wmain(int argc, wchar_t** argv) {
         "{\"success\":%s,\"interface\":\"liquigen.host.command.invoke.v1\","
         "\"command\":\"%.*s\",\"status\":\"%s\",\"pid\":%lu,"
         "\"hwnd\":%llu,\"ui_thread_id\":%lu,\"graph_attempts\":%lu,"
+        "\"graph_item_count\":%lu,\"active_graph_item_count\":%lu,"
         "\"hash_required\":false}\n",
         accepted ? "true" : "false",
         static_cast<int>(command_name.size()),
@@ -362,6 +347,8 @@ int wmain(int argc, wchar_t** argv) {
         static_cast<unsigned long>(arguments.pid),
         static_cast<unsigned long long>(reinterpret_cast<std::uintptr_t>(arguments.hwnd)),
         static_cast<unsigned long>(thread_id),
-        static_cast<unsigned long>(graph_attempts));
+        static_cast<unsigned long>(graph_attempts),
+        static_cast<unsigned long>(graph_item_count),
+        static_cast<unsigned long>(active_graph_item_count));
     return accepted ? 0 : 1;
 }

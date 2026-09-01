@@ -26,6 +26,18 @@ release decision.
 
 ## Higher-fidelity alternatives
 
+## UE-native procedural fallback
+
+Some LiquiGen 1.0.5 exports can pass the FBX/EXR/JSON contract while still
+rendering no visible surface through the installed SideFX Dynamic Remeshing
+function in UE 5.8. This is a host/material compatibility boundary, not proof
+that the export files are corrupt. When the direct VAT preview is empty, use
+`author_procedural_water_cascade` followed by `stage_water_cascade`. That path
+keeps the real LiquiGen project, VAT metadata, timing, and source provenance,
+but renders the water with UE-native Niagara and translucent materials. It is
+the recommended acceptance path for the 0.1.0 showcase until the direct VAT
+parameter contract is confirmed for the target LiquiGen build.
+
 - Alembic: use an Unreal-centimeter export convention and import as a Geometry
   Cache when cinematic fidelity matters more than runtime cost.
 - Image flipbook: use an EXR atlas for HDR or PNG for broad compatibility. It is

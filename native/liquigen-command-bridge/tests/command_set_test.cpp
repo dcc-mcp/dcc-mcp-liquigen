@@ -16,6 +16,9 @@ using liquigen::command_bridge::OdinString;
 using liquigen::command_bridge::CommandId;
 using liquigen::command_bridge::CommandName;
 using liquigen::command_bridge::HostCommandName;
+using liquigen::command_bridge::UsesGraphDispatch;
+using liquigen::command_bridge::RequiresConsumerAcknowledgement;
+using liquigen::command_bridge::ShouldCompleteGraphDispatch;
 
 namespace {
 
@@ -62,6 +65,32 @@ int main() {
         !Check(
             HostCommandName(CommandId::kSwitchTabToExport) == "switch-tab-to-export",
             "export-tab semantic command mapping changed") ||
+        !Check(
+            UsesGraphDispatch(CommandId::kExportAll),
+            "export-all must run in the live project graph context") ||
+        !Check(
+            !RequiresConsumerAcknowledgement(CommandId::kExportAll),
+            "export-all completion must be verified from fresh export files") ||
+        !Check(
+            !ShouldCompleteGraphDispatch(CommandId::kExportAll, true, 0),
+            "an empty helper graph must not complete export-all dispatch") ||
+        !Check(
+            ShouldCompleteGraphDispatch(CommandId::kExportAll, true, 26),
+            "a nonempty project graph may consume export-all") ||
+        !Check(
+            ShouldCompleteGraphDispatch(CommandId::kResetGraphZoom, true, 0),
+            "ordinary graph commands may complete on an empty graph") ||
+        !Check(
+            UsesGraphDispatch(CommandId::kPlayTimeline),
+            "timeline playback must remain graph-consumer acknowledged") ||
+        !Check(
+            HostCommandName(CommandId::kResetSimulation) == "hard-reset" &&
+                UsesGraphDispatch(CommandId::kResetSimulation),
+            "simulation-reset semantic command mapping changed") ||
+        !Check(
+            HostCommandName(CommandId::kResetTimeline) == "reset" &&
+                UsesGraphDispatch(CommandId::kResetTimeline),
+            "timeline-reset semantic command mapping changed") ||
         !Check(
             HostCommandName(CommandId::kToggleFullscreenGraph) == "toggle-fullscreen-graph",
             "graph-view semantic command mapping changed") ||

@@ -23,6 +23,12 @@ and keeps the output directory explicit. `run_export_workflow` then loads the
 exact staged project, drives named playback/export commands, waits for fresh
 stable files, and validates the canonical VAT bundle before UE handoff.
 
+For UE 5.8 hosts where the SideFX Dynamic Remeshing material produces an empty
+surface, `author_procedural_water_cascade` and `stage_water_cascade` provide a
+UE-native Niagara/translucent-material fallback. It preserves the real
+LiquiGen graph timing and export provenance while avoiding a version-specific
+VAT shader parameter mismatch.
+
 The repository includes a UE 5.8 receiver for the VAT FBX, animation textures,
 and metadata, plus a flipbook fallback. Automated tests cover graph mutation,
 bundle validation, host binding, and receiver contracts. A passing CI run does

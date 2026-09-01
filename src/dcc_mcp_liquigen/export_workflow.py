@@ -106,6 +106,25 @@ def _configured_export_directories(project: Path, roots: Sequence[Path]) -> list
     return sorted(set(directories), key=str.casefold)
 
 
+def _required_export_bundle_type(project: Path, roots: Sequence[Path]) -> Optional[str]:
+    """Return the primary enabled export contract that must actually finish."""
+
+    snapshot = inspect_project_graph(str(project), roots=roots)
+    for node in snapshot["nodes"]:
+        if node.get("type") != "Node_Export_Mesh":
+            continue
+        if node.get("disabled") is True or node.get("on") is False:
+            continue
+        parameters = {
+            parameter.get("name"): parameter.get("value")
+            for parameter in node.get("parameters", [])
+            if isinstance(parameter, dict)
+        }
+        if parameters.get("export_kind") == "Vertex_Animated_Texture":
+            return "liquigen_vat"
+    return None
+
+
 def _fresh_paths(before: FileState, current: FileState) -> set[str]:
     return {path for path, state in current.items() if before.get(path) != state}
 
@@ -178,6 +197,7 @@ def run_export_workflow(
         raise LiquiGenExportWorkflowError(
             "output_directory must be empty; use a new directory for every export"
         )
+    required_bundle_type = _required_export_bundle_type(project, selected_roots)
 
     commands: list[dict[str, object]] = []
 
@@ -191,6 +211,8 @@ def run_export_workflow(
         sleep(settle_duration)
     run("reset_graph_zoom", timeout_ms=10000)
     if simulation_duration:
+        run("reset_simulation", timeout_ms=10000)
+        run("reset_timeline", timeout_ms=10000)
         run("play_timeline", timeout_ms=10000)
         try:
             sleep(simulation_duration)
@@ -204,6 +226,9 @@ def run_export_workflow(
         raise LiquiGenExportWorkflowError(
             "output_directory changed before export; use another new directory"
         )
+    run("switch_tab_to_export", timeout_ms=10000)
+    if settle_duration:
+        sleep(settle_duration)
     run("export_all", timeout_ms=30000)
     started_at = monotonic()
     deadline = started_at + timeout
@@ -225,6 +250,13 @@ def run_export_workflow(
                 last_validation_error = str(error)
             else:
                 if bundle["valid"] is True:
+                    if required_bundle_type and bundle.get("bundle_type") != required_bundle_type:
+                        last_validation_error = (
+                            f"expected {required_bundle_type}, got "
+                            f"{bundle.get('bundle_type', 'unknown')}"
+                        )
+                        sleep(poll_interval)
+                        continue
                     required = _required_fresh_paths(bundle)
                     stale_required = sorted(required - fresh)
                     if required and not stale_required:

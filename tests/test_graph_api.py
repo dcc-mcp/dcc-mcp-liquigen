@@ -209,12 +209,16 @@ def test_prepare_unreal_water_project_preserves_official_appearance_and_adds_vat
     mesh_export = next(item for item in snapshot["nodes"] if item["type"] == "Node_Export_Mesh")
     image_export = next(item for item in snapshot["nodes"] if item["type"] == "Node_Export_Image")
     parameters = {item["name"]: item["value"] for item in mesh_export["parameters"]}
+    image_parameters = {item["name"]: item["value"] for item in image_export["parameters"]}
     appearance = {item["name"]: item["value"] for item in simulation["parameters"]}
 
     assert appearance["appearance.albedo"] == [0.08, 0.32, 0.55]
     assert appearance["appearance.refractive_index"] == 1.33
     assert appearance["appearance.emission"] == 0.0
-    assert image_export["disabled"] is True
+    assert image_export["disabled"] is False
+    assert image_export["on"] is True
+    assert image_parameters["directory"] == str(output)
+    assert image_parameters["filename"] == "LiquiGen_BallDropSplash_$(safename)"
     assert snapshot["settings"]["read_only"] is False
     assert parameters["filename"] == "LiquiGen_BallDropSplash"
     assert parameters["directory"] == str(output)
@@ -227,6 +231,7 @@ def test_prepare_unreal_water_project_preserves_official_appearance_and_adds_vat
     assert result["source_kind"] == "installed_official_preset"
     assert result["source_preset"] == "ball_drop_splash"
     assert result["appearance_preserved"] is True
+    assert result["paired_image_export_enabled"] is True
     assert result["requires_cua"] is False
 
 
@@ -324,6 +329,31 @@ def test_apply_graph_transaction_creates_connects_animates_and_validates(tmp_pat
     assert emitter["label"] == "Burst 01"
     assert emitter["links"][0]["to_node"] == 10
     assert emitter["parameters"][0]["automation"]["lanes"][0]["keys"][1]["position"] == 7.2
+
+
+def test_apply_graph_transaction_accepts_exact_decimal_string_node_ids(tmp_path: Path):
+    executable, source, workspace = _installation(tmp_path)
+    destination = workspace / "string-node-id.liquigen"
+
+    result = apply_graph_transaction(
+        str(source),
+        str(destination),
+        [
+            {
+                "op": "set_node_state",
+                "node": "10",
+                "label": "Selected without JSON integer rounding",
+            }
+        ],
+        executable=str(executable),
+        destination_roots=[workspace],
+        source_roots=[workspace],
+    )
+
+    snapshot = inspect_project_graph(str(destination), roots=[workspace])
+
+    assert result["validated"] is True
+    assert snapshot["nodes"][0]["label"] == "Selected without JSON integer rounding"
 
 
 def test_apply_graph_transaction_rejects_unobserved_connection_pins(tmp_path: Path):

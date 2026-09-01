@@ -12,7 +12,7 @@ context at runtime, requires an official command-name literal for named events,
 and validates the command-set structure before inserting an event. Executable
 hashes are not used. A mismatched build fails closed with `profile_mismatch`.
 
-The whitelist contains project open/save, timeline play/pause, export all,
+The whitelist contains project open/save, timeline play/pause/reset, export all,
 export selected, graph framing, viewport/export tabs, fullscreen graph, the
 project palette, and the command palette. `show_project_palette` and
 `return_to_project` set and read back the host-owned Home/project state without

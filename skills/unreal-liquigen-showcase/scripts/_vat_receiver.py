@@ -152,15 +152,18 @@ def _configure_fluid_mesh(unreal, mesh) -> None:
     if subsystem is None:
         raise RuntimeError("StaticMeshEditorSubsystem is unavailable")
     build_settings = subsystem.get_lod_build_settings(mesh, 0)
-    build_settings.set_editor_property("use_full_precision_u_vs", True)
-    build_settings.set_editor_property("use_backwards_compatible_f16_trunc_u_vs", False)
+    build_settings.set_editor_property("use_full_precision_u_vs", False)
+    build_settings.set_editor_property("use_backwards_compatible_f16_trunc_u_vs", True)
+    build_settings.set_editor_property("generate_lightmap_u_vs", False)
     mesh.modify()
     subsystem.set_lod_build_settings(mesh, 0, build_settings)
     readback = subsystem.get_lod_build_settings(mesh, 0)
-    if not readback.get_editor_property("use_full_precision_u_vs") or readback.get_editor_property(
-        "use_backwards_compatible_f16_trunc_u_vs"
+    if (
+        readback.get_editor_property("use_full_precision_u_vs")
+        or not readback.get_editor_property("use_backwards_compatible_f16_trunc_u_vs")
+        or readback.get_editor_property("generate_lightmap_u_vs")
     ):
-        raise RuntimeError("fluid VAT static mesh UV precision settings failed readback")
+        raise RuntimeError("fluid VAT static mesh compatibility settings failed readback")
     if not unreal.EditorAssetLibrary.save_loaded_asset(mesh, only_if_is_dirty=False):
         raise RuntimeError("failed to save configured fluid VAT mesh")
 
@@ -239,6 +242,12 @@ def _create_material(unreal, destination: str, name: str):
     )
     if material is None:
         raise RuntimeError(f"failed to create VAT material: {destination}/{name}")
+    material.set_editor_property("blend_mode", unreal.BlendMode.BLEND_TRANSLUCENT)
+    material.set_editor_property(
+        "translucency_lighting_mode",
+        unreal.TranslucencyLightingMode.TLM_SURFACE_PER_PIXEL_LIGHTING,
+    )
+    material.set_editor_property("two_sided", True)
     material.set_editor_property("tangent_space_normal", False)
     material.set_editor_property("used_with_instanced_static_meshes", True)
     material.set_editor_property("used_with_niagara_mesh_particles", True)
@@ -246,16 +255,41 @@ def _create_material(unreal, destination: str, name: str):
         material, unreal.MaterialExpressionMaterialFunctionCall, -800, 0
     )
     expression.set_material_function(function)
-    connections = (
-        ("Color RGB (PS)", unreal.MaterialProperty.MP_BASE_COLOR),
+    function_connections = (
         ("Normal (Tangent Space Normal Off)", unreal.MaterialProperty.MP_NORMAL),
         ("World Position Offset", unreal.MaterialProperty.MP_WORLD_POSITION_OFFSET),
     )
-    for output_name, property_name in connections:
+    for output_name, property_name in function_connections:
         if not unreal.MaterialEditingLibrary.connect_material_property(
             expression, output_name, property_name
         ):
             raise RuntimeError("failed to connect fluid VAT material output: " + output_name)
+
+    water_tint = unreal.MaterialEditingLibrary.create_material_expression(
+        material, unreal.MaterialExpressionVectorParameter, -420, -300
+    )
+    water_tint.set_editor_property("parameter_name", "Water Tint")
+    water_tint.set_editor_property("default_value", unreal.LinearColor(0.015, 0.12, 0.18, 1.0))
+    scalar_specs = (
+        ("Water Roughness", 0.08, unreal.MaterialProperty.MP_ROUGHNESS, -420, -180),
+        ("Water Specular", 0.5, unreal.MaterialProperty.MP_SPECULAR, -420, -80),
+        ("Water Opacity", 0.34, unreal.MaterialProperty.MP_OPACITY, -420, 20),
+        ("Water IOR", 1.33, unreal.MaterialProperty.MP_REFRACTION, -420, 120),
+    )
+    if not unreal.MaterialEditingLibrary.connect_material_property(
+        water_tint, "", unreal.MaterialProperty.MP_BASE_COLOR
+    ):
+        raise RuntimeError("failed to connect UE water tint")
+    for parameter_name, default_value, property_name, node_x, node_y in scalar_specs:
+        parameter = unreal.MaterialEditingLibrary.create_material_expression(
+            material, unreal.MaterialExpressionScalarParameter, node_x, node_y
+        )
+        parameter.set_editor_property("parameter_name", parameter_name)
+        parameter.set_editor_property("default_value", default_value)
+        if not unreal.MaterialEditingLibrary.connect_material_property(
+            parameter, "", property_name
+        ):
+            raise RuntimeError("failed to connect UE water parameter: " + parameter_name)
     if not unreal.EditorAssetLibrary.save_loaded_asset(material, only_if_is_dirty=False):
         raise RuntimeError("failed to persist fluid VAT material before native graph wiring")
     _connect_fluid_customized_uvs(unreal, material, expression)
@@ -300,7 +334,43 @@ def _bind_material_instance(unreal, instance, textures: dict, bundle: dict) -> N
         "Bound Max Y": bundle["bounds_max"][1],
         "Bound Max Z": bundle["bounds_max"][2],
         "Playback Speed": 1.0,
+        "Game Time at First Frame": 0.0,
     }
+    static_switch_parameters = {
+        "Auto Playback": True,
+        "Support Legacy Parameters and Instancing": False,
+        "Positions Require Two Textures": bundle["two_position_textures"],
+    }
+    available_parameters = {
+        "scalar": {str(name) for name in library.get_scalar_parameter_names(instance)},
+        "texture": {str(name) for name in library.get_texture_parameter_names(instance)},
+        "static switch": {
+            str(name) for name in library.get_static_switch_parameter_names(instance)
+        },
+    }
+    required_parameters = {
+        "scalar": set(scalar_parameters),
+        "texture": set(texture_parameters),
+        "static switch": set(static_switch_parameters),
+    }
+    for parameter_type, required_names in required_parameters.items():
+        missing = sorted(required_names - available_parameters[parameter_type])
+        if missing:
+            raise RuntimeError(
+                f"VAT {parameter_type} parameters are unavailable: " + ", ".join(missing)
+            )
+    for parameter, value in static_switch_parameters.items():
+        changed = library.set_material_instance_static_switch_parameter_value(
+            instance, parameter, value
+        )
+        current = bool(
+            library.get_material_instance_static_switch_parameter_value(instance, parameter)
+        )
+        if not changed and current is not value:
+            raise RuntimeError("VAT static switch parameter is unavailable: " + parameter)
+    library.update_material_instance(instance)
+    if not unreal.EditorAssetLibrary.save_loaded_asset(instance, only_if_is_dirty=False):
+        raise RuntimeError("failed to save VAT playback and legacy-bounds parameters")
     configured = _native_payload(
         _material_instance_parameter_bridge(unreal)(
             instance,
@@ -326,6 +396,12 @@ def _bind_material_instance(unreal, instance, textures: dict, bundle: dict) -> N
         actual = float(library.get_material_instance_scalar_parameter_value(instance, parameter))
         if not math.isclose(actual, value, rel_tol=1e-6, abs_tol=1e-6):
             raise RuntimeError("VAT scalar parameter failed readback: " + parameter)
+    for parameter, value in static_switch_parameters.items():
+        actual = bool(
+            library.get_material_instance_static_switch_parameter_value(instance, parameter)
+        )
+        if actual is not value:
+            raise RuntimeError("VAT static switch parameter failed readback: " + parameter)
 
 
 def _vat_names_and_paths(destination: str, prefix: str) -> tuple[dict, dict]:
@@ -384,6 +460,9 @@ def import_vat_assets(unreal, bundle: dict, destination: str, prefix: str) -> di
     fbx_options.set_editor_property("mesh_type_to_import", unreal.FBXImportType.FBXIT_STATIC_MESH)
     static_mesh_import_data = fbx_options.get_editor_property("static_mesh_import_data")
     static_mesh_import_data.set_editor_property("combine_meshes", True)
+    static_mesh_import_data.set_editor_property("generate_lightmap_u_vs", False)
+    static_mesh_import_data.set_editor_property("remove_degenerates", False)
+    static_mesh_import_data.set_editor_property("auto_generate_collision", False)
     fbx_options.set_editor_property("static_mesh_import_data", static_mesh_import_data)
     mesh, paths["mesh"] = _import_task(
         unreal, bundle["assets"]["geometry"], destination, names["mesh"], fbx_options
@@ -442,6 +521,7 @@ def finalize_vat_assets(unreal, bundle: dict, destination: str, prefix: str) -> 
     _material_instance_parameter_bridge(unreal)
     _, paths = _vat_names_and_paths(destination, prefix)
     assets = _load_finalization_assets(unreal, paths)
+    _configure_fluid_mesh(unreal, assets["mesh"])
     textures = {key: assets[key] for key in ("lookup", "position", "rotation")}
     _bind_material_instance(unreal, assets["material_instance"], textures, bundle)
     assets["mesh"].set_material(0, assets["material_instance"])

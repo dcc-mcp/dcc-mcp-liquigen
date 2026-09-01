@@ -38,6 +38,8 @@ def test_host_command_catalog_is_bounded_and_hash_free(monkeypatch, tmp_path: Pa
     assert result["licensing_commands_allowed"] is False
     assert "switch_tab_to_export" in result["commands"]
     assert "reset_graph_zoom" in result["commands"]
+    assert "reset_simulation" in result["commands"]
+    assert "reset_timeline" in result["commands"]
     assert "open_project_path" in result["commands"]
     assert "toggle_project_palette" in result["commands"]
     assert "show_project_palette" in result["commands"]
@@ -47,7 +49,7 @@ def test_host_command_catalog_is_bounded_and_hash_free(monkeypatch, tmp_path: Pa
     ) == {
         "name": "export_all",
         "scope": "node_graph",
-        "acknowledgement": "consumer_acknowledged",
+        "acknowledgement": "event_delivered",
     }
     assert next(
         item for item in result["command_capabilities"] if item["name"] == "open_project_path"
