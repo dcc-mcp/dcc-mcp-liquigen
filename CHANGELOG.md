@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.2.0](https://github.com/dcc-mcp/dcc-mcp-liquigen/compare/v0.1.0...v0.2.0) (2026-09-01)
+
+
+### Features
+
+* support managed LiquiGen setup launch ([6eea819](https://github.com/dcc-mcp/dcc-mcp-liquigen/commit/6eea819a1900ba3ed924ac7c796f7bee0dc16ca7))
+* support managed LiquiGen setup launch ([f9b416e](https://github.com/dcc-mcp/dcc-mcp-liquigen/commit/f9b416eb5f0e397becca7112ef1cb59d8a5cb8b7))
+
 ## 0.1.0 (2026-09-01)
 
 
