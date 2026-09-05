@@ -6,7 +6,7 @@ import json
 import os
 import subprocess
 from pathlib import Path
-from typing import Optional
+from typing import Mapping, Optional, Sequence
 
 from .project import LiquiGenProjectError, resolve_project_path
 from .runtime import RuntimeBinding, runtime_from_env
@@ -241,6 +241,55 @@ def invoke_host_command(
     }
 
 
+def invoke_host_sequence(
+    commands: Sequence[Mapping[str, object]],
+    *,
+    binding: Optional[RuntimeBinding] = None,
+    client: Optional[Path] = None,
+) -> dict[str, object]:
+    """Run a bounded, fail-fast sequence of whitelisted host commands.
+
+    Each item may contain ``command``, ``timeout_ms`` and ``project_path``.
+    The sequence is deliberately small and sequential so callers receive an
+    auditable result for every host-side transition.
+    """
+
+    if not isinstance(commands, Sequence) or isinstance(commands, (str, bytes)):
+        raise LiquiGenHostCommandError("commands must be an array")
+    if not 1 <= len(commands) <= 32:
+        raise LiquiGenHostCommandError("commands must contain between 1 and 32 steps")
+    selected_binding = binding or runtime_from_env()
+    results: list[dict[str, object]] = []
+    for index, item in enumerate(commands):
+        if not isinstance(item, Mapping):
+            raise LiquiGenHostCommandError(f"commands[{index}] must be an object")
+        command = item.get("command")
+        if not isinstance(command, str):
+            raise LiquiGenHostCommandError(f"commands[{index}].command must be a string")
+        timeout_ms = item.get("timeout_ms", 5000)
+        if isinstance(timeout_ms, bool) or not isinstance(timeout_ms, int):
+            raise LiquiGenHostCommandError(f"commands[{index}].timeout_ms must be an integer")
+        project_path = item.get("project_path")
+        if project_path is not None and not isinstance(project_path, str):
+            raise LiquiGenHostCommandError(f"commands[{index}].project_path must be a string")
+        result = invoke_host_command(
+            command,
+            timeout_ms=timeout_ms,
+            project_path=project_path,
+            binding=selected_binding,
+            client=client,
+        )
+        results.append({"index": index, **result})
+    return {
+        "success": True,
+        "interface": "liquigen.host.command.sequence.v1",
+        "steps": results,
+        "step_count": len(results),
+        "binding": selected_binding.as_dict(),
+        "completion_boundary": "all whitelisted host commands consumed in order",
+    }
+
+
 __all__ = [
     "HOST_COMMAND_INTERFACE",
     "HOST_COMMANDS",
@@ -249,6 +298,7 @@ __all__ = [
     "PROJECT_PATH_COMMANDS",
     "LiquiGenHostCommandError",
     "invoke_host_command",
+    "invoke_host_sequence",
     "list_host_commands",
     "resolve_command_client",
 ]

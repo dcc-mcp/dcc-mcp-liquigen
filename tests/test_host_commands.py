@@ -8,6 +8,7 @@ from dcc_mcp_liquigen.host_commands import (
     HOST_COMMANDS,
     LiquiGenHostCommandError,
     invoke_host_command,
+    invoke_host_sequence,
     list_host_commands,
 )
 from dcc_mcp_liquigen.runtime import RuntimeBinding
@@ -174,3 +175,40 @@ def test_open_project_path_requires_path(tmp_path: Path):
             binding=_binding(),
             client=tmp_path / "dcc_mcp_liquigen_command_client.exe",
         )
+
+
+def test_invoke_host_sequence_runs_in_order_and_returns_evidence(monkeypatch):
+    seen = []
+
+    def fake_invoke(command, timeout_ms=5000, project_path=None, **kwargs):
+        seen.append((command, timeout_ms, project_path, kwargs["binding"]))
+        return {"success": True, "command": command, "status": "consumed"}
+
+    monkeypatch.setattr("dcc_mcp_liquigen.host_commands.invoke_host_command", fake_invoke)
+    result = invoke_host_sequence(
+        [
+            {
+                "command": "open_project_path",
+                "project_path": "C:/x/a.liquigen",
+                "timeout_ms": 30000,
+            },
+            {"command": "play_timeline", "timeout_ms": 1000},
+        ],
+        binding=_binding(),
+    )
+
+    assert result["success"] is True
+    assert result["step_count"] == 2
+    assert [item["command"] for item in result["steps"]] == [
+        "open_project_path",
+        "play_timeline",
+    ]
+    assert seen[0][1:3] == (30000, "C:/x/a.liquigen")
+    assert seen[1][1:3] == (1000, None)
+
+
+def test_invoke_host_sequence_rejects_empty_or_oversized_sequence():
+    with pytest.raises(LiquiGenHostCommandError, match="between 1 and 32"):
+        invoke_host_sequence([])
+    with pytest.raises(LiquiGenHostCommandError, match="between 1 and 32"):
+        invoke_host_sequence([{"command": "pause_timeline"}] * 33)
