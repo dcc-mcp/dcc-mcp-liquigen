@@ -11,7 +11,7 @@ metadata:
   dcc-mcp:
     dcc: liquigen
     layer: domain
-    version: "0.2.0"  # x-release-please-version
+    version: "0.3.0"  # x-release-please-version
     search-hint: "LiquiGen liquid VFX preset project inspect validate copy recipe nodes Unreal UE 5.8 flipbook VAT Alembic OpenVDB export"
     tags: [pipeline, liquigen, unreal, vfx]
     tools: tools.yaml
