@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.0](https://github.com/dcc-mcp/dcc-mcp-liquigen/compare/v0.2.0...v0.3.0) (2026-09-05)
+
+
+### Features
+
+* add bounded host command sequences ([28c1e60](https://github.com/dcc-mcp/dcc-mcp-liquigen/commit/28c1e6044a8836450283b2523a3980e05e7a9077))
+
 ## [0.2.0](https://github.com/dcc-mcp/dcc-mcp-liquigen/compare/v0.1.0...v0.2.0) (2026-09-01)
 
 
