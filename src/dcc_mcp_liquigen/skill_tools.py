@@ -25,7 +25,7 @@ from .graph_api import (
 from .graph_api import (
     prepare_unreal_water_project as _prepare_unreal_water_project,
 )
-from .host_commands import invoke_host_command, list_host_commands
+from .host_commands import invoke_host_command, invoke_host_sequence, list_host_commands
 from .project import (
     allowed_roots_from_env,
     inspect_project,
@@ -205,6 +205,7 @@ __all__ = [
     "inspect_project_graph",
     "inspect_project",
     "invoke_host_command",
+    "invoke_host_sequence",
     "list_host_commands",
     "list_node_schemas",
     "prepare_unreal_water_project",
