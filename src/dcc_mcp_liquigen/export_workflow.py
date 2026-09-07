@@ -99,6 +99,11 @@ def _configured_export_directories(project: Path, roots: Sequence[Path]) -> list
         if not str(node.get("type", "")).startswith("Node_Export_"):
             continue
         if node.get("disabled") is True or node.get("on") is False:
+            if node.get("type") == "Node_Export_Image":
+                raise LiquiGenExportWorkflowError(
+                    "export_all requires the paired image exporter to remain enabled; "
+                    "use prepare_unreal_water_project and configure its output path"
+                )
             continue
         for parameter in node.get("parameters", []):
             if parameter.get("name") == "directory" and isinstance(parameter.get("value"), str):
@@ -122,6 +127,8 @@ def _required_export_bundle_type(project: Path, roots: Sequence[Path]) -> Option
         }
         if parameters.get("export_kind") == "Vertex_Animated_Texture":
             return "liquigen_vat"
+        if parameters.get("export_kind") == "Alembic":
+            return "alembic_geometry_cache"
     return None
 
 

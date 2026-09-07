@@ -54,13 +54,18 @@ request, then inspect the destination graph before opening it in LiquiGen.
 
 For an official water showcase, use `prepare_unreal_water_project` with a preset
 path returned by `discover_presets`. It preserves the official simulation,
-collider, camera, and appearance parameters, disables the preset's image export,
-and adds one canonical Unreal VAT exporter. The generated group and note expose
+collider, camera, and appearance parameters, keeps the paired image exporter
+enabled with a valid output path, and adds a mesh exporter. Choose
+`export_profile: alembic` for a Geometry Cache comparison or `ue_vat` for the
+VAT material route. Disabling the image exporter can prevent LiquiGen 1.0.5's
+export pipeline from running; the workflow rejects that configuration before
+dispatch. The generated group and note expose
 the bridge steps in LiquiGen's node graph. The source must remain inside the
 installed official preset directory; never bundle or redistribute that source.
 
-For a game-ready liquid surface, prefer LiquiGen's Unreal VAT export. Use
-Alembic for cinematic geometry, EXR/PNG flipbooks for inexpensive billboard
+For a game-ready liquid surface, validate the target VAT decoder visually
+before choosing it. Use Alembic for a geometry comparison or cinematic geometry,
+EXR/PNG flipbooks for inexpensive billboard
 fallbacks, and OpenVDB only as auxiliary velocity data. LiquiGen does not
 simulate combustion, so describe this recipe as a liquid chain burst rather
 than fire or smoke.

@@ -1,0 +1,40 @@
+tools:
+  - name: probe_receiver
+    description: Read the engine version and Geometry Cache import API availability without changing the scene.
+    source_file: scripts/probe_receiver.py
+    input_schema:
+      type: object
+      properties: {}
+      additionalProperties: false
+    execution: sync
+    affinity: main
+    enforce_thread_affinity: true
+    timeout_hint_secs: 30
+    annotations: {read_only_hint: true, destructive_hint: false, idempotent_hint: true}
+  - name: import_cache
+    description: Import an actual Alembic mesh into a new Unreal Geometry Cache asset, preserving samples and explicitly converting coordinates.
+    source_file: scripts/import_cache.py
+    input_schema:
+      type: object
+      properties:
+        source: {type: string}
+        destination: {type: string, pattern: '^/Game/[A-Za-z0-9_]+(?:/[A-Za-z0-9_]+)*$'}
+        asset_name: {type: string, pattern: '^[A-Za-z][A-Za-z0-9_]*$'}
+        scale:
+          type: array
+          items: {type: number}
+          minItems: 3
+          maxItems: 3
+        rotation:
+          type: array
+          items: {type: number}
+          minItems: 3
+          maxItems: 3
+        import_velocities: {type: boolean, default: false}
+      required: [source, destination, asset_name, scale, rotation]
+      additionalProperties: false
+    execution: sync
+    affinity: main
+    enforce_thread_affinity: true
+    timeout_hint_secs: 180
+    annotations: {read_only_hint: false, destructive_hint: false, idempotent_hint: false}

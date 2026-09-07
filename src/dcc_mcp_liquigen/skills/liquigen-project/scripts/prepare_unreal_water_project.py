@@ -9,6 +9,7 @@ def main(
     output_directory,
     asset_name="LiquiGen_BallDropSplash",
     frame_count=64,
+    export_profile="ue_vat",
 ):
     return {
         "success": True,
@@ -18,6 +19,7 @@ def main(
             output_directory,
             asset_name=asset_name,
             frame_count=frame_count,
+            export_profile=export_profile,
         ),
     }
 

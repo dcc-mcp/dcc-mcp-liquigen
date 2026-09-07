@@ -189,7 +189,10 @@ def _water_installation(
     return executable, source, workspace
 
 
-def test_prepare_unreal_water_project_preserves_official_appearance_and_adds_vat(tmp_path: Path):
+@pytest.mark.parametrize("export_profile", ["ue_vat", "alembic"])
+def test_prepare_unreal_water_project_preserves_official_appearance_and_adds_vat(
+    tmp_path: Path, export_profile: str
+):
     executable, source, workspace = _water_installation(tmp_path)
     destination = workspace / "ball-drop-water-ue58.liquigen"
     output = workspace / "exports"
@@ -201,6 +204,7 @@ def test_prepare_unreal_water_project_preserves_official_appearance_and_adds_vat
         executable=str(executable),
         asset_name="LiquiGen_BallDropSplash",
         frame_count=72,
+        export_profile=export_profile,
         destination_roots=[workspace],
         source_roots=[source.parent, workspace],
     )
@@ -222,7 +226,10 @@ def test_prepare_unreal_water_project_preserves_official_appearance_and_adds_vat
     assert snapshot["settings"]["read_only"] is False
     assert parameters["filename"] == "LiquiGen_BallDropSplash"
     assert parameters["directory"] == str(output)
-    assert parameters["export_kind"] == "Vertex_Animated_Texture"
+    assert parameters["export_kind"] == (
+        "Vertex_Animated_Texture" if export_profile == "ue_vat" else "Alembic"
+    )
+    assert parameters["export_velocity"] is (export_profile == "alembic")
     assert parameters["num_frames"] == 72.0
     assert parameters["vat_target_engine"] == "Unreal"
     assert simulation["links"][-1]["to_node"] == mesh_export["id"]
@@ -232,6 +239,7 @@ def test_prepare_unreal_water_project_preserves_official_appearance_and_adds_vat
     assert result["source_preset"] == "ball_drop_splash"
     assert result["appearance_preserved"] is True
     assert result["paired_image_export_enabled"] is True
+    assert result["export_profile"] == export_profile
     assert result["requires_cua"] is False
 
 

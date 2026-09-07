@@ -11,6 +11,7 @@ recursive-include packaging *.ps1
 recursive-include examples *.ini *.md *.py *.uproject
 recursive-include native CMakeLists.txt *.cpp *.h *.json *.md
 recursive-include src/dcc_mcp_liquigen/skills *.md *.py *.yaml
+recursive-include skills *.md *.py *.yaml
 recursive-include tests *.py
 prune .artifacts
 prune dist
