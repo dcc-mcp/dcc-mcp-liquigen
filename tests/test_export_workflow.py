@@ -134,8 +134,9 @@ def test_run_export_workflow_rejects_unconfigured_directory(monkeypatch, tmp_pat
         )
 
 
+@pytest.mark.parametrize("required_type", ["liquigen_vat", "alembic_geometry_cache"])
 def test_run_export_workflow_does_not_accept_flipbook_when_vat_is_enabled(
-    monkeypatch, tmp_path: Path
+    monkeypatch, tmp_path: Path, required_type: str
 ):
     project = tmp_path / "water.liquigen"
     project.write_bytes(b"project")
@@ -147,7 +148,7 @@ def test_run_export_workflow_does_not_accept_flipbook_when_vat_is_enabled(
     )
     monkeypatch.setattr(
         "dcc_mcp_liquigen.export_workflow._required_export_bundle_type",
-        lambda _project, _roots: "liquigen_vat",
+        lambda _project, _roots: required_type,
     )
 
     def command_runner(command, **_arguments):
@@ -156,7 +157,7 @@ def test_run_export_workflow_does_not_accept_flipbook_when_vat_is_enabled(
         return {"success": True, "command": command, "status": "consumed"}
 
     clock = _Clock()
-    with pytest.raises(LiquiGenExportWorkflowError, match="expected liquigen_vat"):
+    with pytest.raises(LiquiGenExportWorkflowError, match="expected " + required_type):
         run_export_workflow(
             str(project),
             str(output),
@@ -169,4 +170,25 @@ def test_run_export_workflow_does_not_accept_flipbook_when_vat_is_enabled(
             command_runner=command_runner,
             sleep=clock.sleep,
             monotonic=clock.monotonic,
+        )
+
+
+def test_disabled_image_export_is_rejected_before_host_commands(monkeypatch, tmp_path):
+    project = tmp_path / "source.liquigen"
+    project.write_bytes(b"fixture")
+    output = tmp_path / "out"
+    output.mkdir()
+    monkeypatch.setattr(
+        "dcc_mcp_liquigen.export_workflow.inspect_project_graph",
+        lambda *args, **kwargs: {
+            "nodes": [{"type": "Node_Export_Image", "disabled": True, "on": True}]
+        },
+    )
+
+    def unexpected_command(*args, **kwargs):
+        pytest.fail("invalid export plan reached the host")
+
+    with pytest.raises(LiquiGenExportWorkflowError, match="paired image exporter"):
+        run_export_workflow(
+            str(project), str(output), roots=[tmp_path], command_runner=unexpected_command
         )

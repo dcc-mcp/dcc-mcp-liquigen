@@ -1,8 +1,8 @@
 # LiquiGen to Unreal Engine 5.8
 
-## Recommended runtime asset: Unreal VAT
+## Runtime candidate: Unreal VAT
 
-LiquiGen's Unreal-targeted Vertex Animated Texture (VAT) export is the default
+LiquiGen's Unreal-targeted Vertex Animated Texture (VAT) export is a candidate
 handoff for a game-ready liquid surface. Keep its FBX geometry, animation
 textures, and JSON metadata together as one source bundle. The UE receiver
 imports that bundle, authors `M_LiquiGen_VAT_Master` and a material instance,
@@ -10,12 +10,13 @@ then exposes playback and water material parameters through Unreal's material
 system. Niagara remains available for secondary timing or instancing behavior;
 it is not required to decode the primary water mesh.
 
-The verified local decoder is SideFX Labs 22.0.408's UE 5.8 content-only
+The locally integrated decoder is SideFX Labs 22.0.408's UE 5.8 content-only
 `Houdini_VAT_DynamicRemeshing` material function. LiquiGen's canonical export
 names and metadata match the Dynamic Remeshing (Fluid) contract: FBX geometry,
 lookup/position/rotation EXRs, and `*_info.json`. The receiver configures EXRs as
-nearest-filtered, no-mipmap, linear HDR data and enables full-precision mesh UVs
-before authoring the material and instance.
+nearest-filtered, no-mipmap, linear HDR data. The implementation currently uses
+legacy F16 UV truncation; inspect the actual mesh settings when diagnosing a
+decoder mismatch. Integration and file checks do not establish visible playback.
 
 SideFX Labs is a separate BSD-style dependency and is not copied into the
 adapter bundle. For local testing, install and enable its UE 5.8 content plugin
@@ -35,8 +36,8 @@ that the export files are corrupt. When the direct VAT preview is empty, use
 `author_procedural_water_cascade` followed by `stage_water_cascade`. That path
 keeps the real LiquiGen project, VAT metadata, timing, and source provenance,
 but renders the water with UE-native Niagara and translucent materials. It is
-the recommended acceptance path for the 0.1.0 showcase until the direct VAT
-parameter contract is confirmed for the target LiquiGen build.
+a separate illustrative effect and must not serve as acceptance of the exported
+fluid's geometry, normals, timing, or material equivalence.
 
 - Alembic: use an Unreal-centimeter export convention and import as a Geometry
   Cache when cinematic fidelity matters more than runtime cost.
@@ -46,6 +47,26 @@ parameter contract is confirmed for the target LiquiGen build.
   Volume Textures as auxiliary data, not as the primary liquid surface.
 
 ## Official water preset recipe
+
+Set `export_profile` to `alembic` to prepare a changing-topology Geometry Cache
+comparison, or keep `ue_vat` for the VAT route. Both preserve the active paired
+image exporter and configure its output path. Do not disable that exporter on
+the investigated 1.0.5 build: the existing paired-export control experiment
+requires it, and `run_export_workflow` now rejects that plan before host calls.
+
+Frame count is a sampling contract, not a wall-clock simulation duration. At
+60 FPS, 64 samples cover only about 1.07 seconds; select enough frames to include
+the event being compared. Preserve export FPS, first frame, and stride in the
+evidence. The latest JangaFX documentation's Unreal centimeters convention is
+not present in the inspected 1.0.5 template; do not invent that parameter. Verify
+the actual Alembic coordinates and apply one explicit conversion at import.
+
+The `unreal-liquigen-geometry-cache` skill probes the actual UE import API and
+imports into a new folder using the official Alembic Geometry Cache importer.
+It preserves per-frame sampling, disables constant-topology optimizations, and
+optionally imports source velocities. It returns cache frame count, duration,
+tracks and source hash, without changing the current level. These checks still
+require a subsequent coordinated multi-frame visual comparison.
 
 Call `prepare_unreal_water_project` with an official preset discovered in the
 local LiquiGen installation, for example `ball_drop_splash.liquigen`. The tool

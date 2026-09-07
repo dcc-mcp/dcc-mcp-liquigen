@@ -178,6 +178,7 @@ def prepare_unreal_water_project(
     output_directory: str,
     asset_name: str = "LiquiGen_BallDropSplash",
     frame_count: int = 64,
+    export_profile: str = "ue_vat",
 ) -> dict[str, object]:
     executable = os.environ.get("DCC_MCP_LIQUIGEN_EXECUTABLE")
     if not executable:
@@ -191,6 +192,7 @@ def prepare_unreal_water_project(
         executable=executable,
         asset_name=asset_name,
         frame_count=frame_count,
+        export_profile=export_profile,
         destination_roots=destination_roots,
         source_roots=source_roots,
     )

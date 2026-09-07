@@ -49,6 +49,11 @@ def test_public_bundle_contains_only_external_adapter_payload(tmp_path: Path):
     (showcase_skill / "scripts" / "import_vat_bundle.py").write_text(
         "# VAT receiver\n", encoding="utf-8"
     )
+    geometry_skill = project / "skills" / "unreal-liquigen-geometry-cache"
+    (geometry_skill / "scripts").mkdir(parents=True)
+    (geometry_skill / "SKILL.md").write_text("# Geometry Cache\n", encoding="utf-8")
+    (geometry_skill / "tools.yaml").write_text("tools: []\n", encoding="utf-8")
+    (geometry_skill / "scripts" / "import_cache.py").write_text("# import\n", encoding="utf-8")
 
     artifacts = build_public_bundle(project, tmp_path / "release", wheel, "0.1.0")
 
@@ -63,6 +68,9 @@ def test_public_bundle_contains_only_external_adapter_payload(tmp_path: Path):
         assert "ue58_receiver/skills/unreal-liquigen-showcase/SKILL.md" in names
         assert "ue58_receiver/skills/unreal-liquigen-showcase/tools.yaml" in names
         assert "ue58_receiver/skills/unreal-liquigen-showcase/scripts/import_vat_bundle.py" in names
+        for relative in ("SKILL.md", "tools.yaml", "scripts/import_cache.py"):
+            assert f"ue58_receiver/skills/unreal-liquigen-geometry-cache/{relative}" in names
+        assert manifest["distribution"]["geometry_cache_skill"] in names
         assert not any(name.startswith("native/") for name in names)
         assert not any("research-notes" in name for name in names)
         assert manifest["host_match"]["executable_hash_required"] is False
@@ -106,6 +114,9 @@ def test_local_native_bundle_is_explicit_and_checksums_both_bridge_files(tmp_pat
     showcase_skill = project / "skills" / "unreal-liquigen-showcase"
     showcase_skill.mkdir(parents=True)
     (showcase_skill / "SKILL.md").write_text("skill\n", encoding="utf-8")
+    geometry_skill = project / "skills" / "unreal-liquigen-geometry-cache"
+    geometry_skill.mkdir(parents=True)
+    (geometry_skill / "SKILL.md").write_text("skill\n", encoding="utf-8")
     native = project / ".artifacts" / "liquigen-command-bridge-build" / "Release"
     native.mkdir(parents=True)
     (native / "dcc_mcp_liquigen_command_client.exe").write_bytes(b"client")

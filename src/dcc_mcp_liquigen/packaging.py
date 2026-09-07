@@ -98,6 +98,7 @@ def _manifest(
             "kind": "external_adapter",
             "ue58_receiver": "ue58_receiver/LiquiGenUE58.uproject",
             "ue58_skill": "ue58_receiver/skills/unreal-liquigen-showcase/SKILL.md",
+            "geometry_cache_skill": "ue58_receiver/skills/unreal-liquigen-geometry-cache/SKILL.md",
             "includes_injection_payload": includes_native_bridge,
             "includes_liquigen_binaries": False,
             "includes_liquigen_presets": False,
@@ -149,10 +150,11 @@ def _build_bundle(
         and "__pycache__" not in path.parts
         and path.suffix.casefold() in {".ini", ".md", ".py", ".uproject"}
     )
-    showcase_skill_root = (root / "skills" / "unreal-liquigen-showcase").resolve(strict=True)
+    showcase_skill_root = (root / "skills").resolve(strict=True)
     showcase_skill_files = sorted(
         path
-        for path in showcase_skill_root.rglob("*")
+        for skill_name in ("unreal-liquigen-showcase", "unreal-liquigen-geometry-cache")
+        for path in (showcase_skill_root / skill_name).resolve(strict=True).rglob("*")
         if path.is_file()
         and "__pycache__" not in path.parts
         and path.suffix.casefold() in {".md", ".py", ".yaml"}
@@ -188,7 +190,7 @@ def _build_bundle(
             _write_bytes(archive, name, path.read_bytes())
         for path in showcase_skill_files:
             relative = path.relative_to(showcase_skill_root).as_posix()
-            name = f"ue58_receiver/skills/unreal-liquigen-showcase/{relative}"
+            name = f"ue58_receiver/skills/{relative}"
             _write_bytes(archive, name, path.read_bytes())
     checksum = output / f"{bundle.name}.sha256"
     checksum.write_text(f"{_sha256(bundle)}  {bundle.name}\n", encoding="ascii")

@@ -557,11 +557,14 @@ def prepare_unreal_water_project(
     executable: str,
     asset_name: str = "LiquiGen_BallDropSplash",
     frame_count: int = 64,
+    export_profile: str = "ue_vat",
     destination_roots: Optional[Sequence[Path]] = None,
     source_roots: Optional[Sequence[Path]] = None,
 ) -> dict[str, Any]:
-    """Preserve an installed official water preset and add one UE VAT export route."""
+    """Preserve an official water preset and its paired image/mesh export graph."""
 
+    if export_profile not in {"ue_vat", "alembic"}:
+        raise LiquiGenGraphApiError("export_profile must be ue_vat or alembic")
     if not re.fullmatch(r"[A-Za-z][A-Za-z0-9_]{0,127}", asset_name):
         raise LiquiGenGraphApiError(
             "asset_name must start with a letter and contain only letters, digits, or underscores"
@@ -609,9 +612,9 @@ def prepare_unreal_water_project(
         "stride_frames",
         "numbering_offset",
         "compensate_framerate",
-        "vat_max_lookup_width",
-        "vat_max_texture_width",
     }
+    if export_profile == "ue_vat":
+        required_parameters.update({"vat_max_lookup_width", "vat_max_texture_width"})
     available_parameters = {item["name"] for item in mesh_schema["parameters"]}
     image_schema = schemas.get("Node_Export_Image")
     if image_schema is None:
@@ -643,38 +646,38 @@ def prepare_unreal_water_project(
         target = int(_plain_field(mesh_exports[0], "id"))
         operations.append({"op": "set_node_state", "node": target, "disabled": False, "on": True})
     else:
-        target = "ue_vat_export"
+        target = "ue_vat_export" if export_profile == "ue_vat" else "ue_alembic_export"
         operations.append(
             {
                 "op": "create_node",
                 "alias": target,
                 "node_type": "Node_Export_Mesh",
                 "position": [920.0, 240.0],
-                "label": "UE 5.8 Water VAT Export",
+                "label": "Unreal Water " + export_profile + " Export",
             }
         )
 
     export_parameters: dict[str, Any] = {
         "filename": asset_name,
         "directory": str(export_path),
-        "export_kind": "Vertex_Animated_Texture",
-        "export_velocity": False,
+        "export_kind": "Vertex_Animated_Texture" if export_profile == "ue_vat" else "Alembic",
+        "export_velocity": export_profile == "alembic",
         "first_frame": 0.0,
         "num_frames": float(frame_count),
         "stride_frames": 1.0,
         "numbering_offset": 0.0,
         "compensate_framerate": True,
-        "vat_max_lookup_width": 2048.0,
-        "vat_max_texture_width": 2048.0,
     }
+    if export_profile == "ue_vat":
+        export_parameters.update(vat_max_lookup_width=2048.0, vat_max_texture_width=2048.0)
     target_engine_parameter_available = "vat_target_engine" in available_parameters
-    if target_engine_parameter_available:
+    if export_profile == "ue_vat" and target_engine_parameter_available:
         export_parameters["vat_target_engine"] = "Unreal"
     operations.extend(
         {"op": "set_parameter", "node": target, "name": name, "value": value}
         for name, value in export_parameters.items()
     )
-    if not target_engine_parameter_available:
+    if export_profile == "ue_vat" and not target_engine_parameter_available:
         operations.append(
             {
                 "op": "add_parameter",
@@ -731,8 +734,8 @@ def prepare_unreal_water_project(
                 "text": (
                     "DCC-MCP OFFICIAL WATER PRESET\n"
                     "1 · Keep the official simulation, collider, camera, and water appearance\n"
-                    "2 · Route Simulation.Mesh into the UE 5.8 VAT exporter\n"
-                    "3 · Export canonical FBX, position, rotation, lookup, and metadata assets\n"
+                    "2 · Route Simulation.Mesh into the " + export_profile + " exporter\n"
+                    "3 · Keep paired image export enabled with a valid output path\n"
                     "4 · Import through dcc-mcp-unreal and bind a translucent water material"
                 ),
                 "position": [660.0, -80.0],
@@ -764,14 +767,22 @@ def prepare_unreal_water_project(
         "source_preset": source_path.stem,
         "asset_name": asset_name,
         "frame_count": int(frame_count),
+        "export_profile": export_profile,
+        "coordinate_conversion": (
+            "VAT target engine"
+            if export_profile == "ue_vat"
+            else "verify source units and axes before Unreal import; no convention inferred"
+        ),
         "output_directory": str(export_path),
         "appearance_preserved": True,
         "paired_image_export_enabled": True,
         "derived_project_writable": True,
-        "vat_target_engine": "Unreal",
+        "vat_target_engine": "Unreal" if export_profile == "ue_vat" else None,
         "vat_target_engine_parameter_available": target_engine_parameter_available,
         "vat_target_engine_compatibility_mode": (
-            "declared_parameter"
+            "not_applicable"
+            if export_profile == "alembic"
+            else "declared_parameter"
             if target_engine_parameter_available
             else "legacy_parameter_backfill"
         ),
