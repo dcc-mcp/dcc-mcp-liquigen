@@ -4,6 +4,7 @@ import importlib.util
 import sys
 from pathlib import Path
 from types import SimpleNamespace
+from unittest.mock import Mock
 
 import pytest
 from dcc_mcp_core import validate_skill
@@ -88,3 +89,76 @@ def test_existing_destination_is_rejected_before_import(importer, request_args, 
     with pytest.raises(ValueError, match="new asset folder"):
         importer(**request_args)
     assert checked == [request_args["destination"]]
+
+
+@pytest.fixture
+def unreal_import(monkeypatch):
+    unreal = Mock()
+    unreal.GeometryCache = type("GeometryCache", (), {})
+    asset = unreal.GeometryCache()
+    asset.get_path_name = lambda: "/Game/LiquiGen/Test/Fluid.Fluid"
+    unreal.EditorAssetLibrary.does_directory_exist.return_value = False
+    unreal.EditorAssetLibrary.load_asset.return_value = asset
+    unreal.AssetImportTask.return_value.imported_object_paths = [asset.get_path_name()]
+    component = unreal.new_object.return_value
+    component.get_duration.return_value = 6.0
+    component.get_number_of_frames.return_value = 180
+    component.get_number_of_tracks.return_value = 1
+    monkeypatch.setitem(sys.modules, "unreal", unreal)
+    return unreal
+
+
+@pytest.mark.parametrize("path_count", [1, 2, 3])
+def test_import_accepts_one_distinct_cache(importer, request_args, unreal_import, path_count):
+    task = unreal_import.AssetImportTask.return_value
+    task.imported_object_paths *= path_count
+
+    result = importer(**request_args)
+
+    unreal_import.AssetToolsHelpers.get_asset_tools().import_asset_tasks.assert_called_once_with(
+        [task]
+    )
+    unreal_import.EditorAssetLibrary.load_asset.assert_called_once_with(
+        task.imported_object_paths[0]
+    )
+    unreal_import.new_object.return_value.set_geometry_cache.assert_called_once_with(
+        unreal_import.EditorAssetLibrary.load_asset.return_value
+    )
+    assert result["success"] is True
+    assert result["context"]["frame_count"] == 180
+    assert result["context"]["duration_seconds"] == 6.0
+    assert result["context"]["visual_acceptance"] is False
+    assert task.replace_existing is False
+
+
+@pytest.mark.parametrize(
+    "paths",
+    [[], ["/Game/Test/A.A", "/Game/Test/B.B"], ["/Game/Test/A.A"] * 2 + ["/Game/Test/B.B"]],
+)
+def test_import_rejects_zero_or_multiple_distinct_assets(
+    importer, request_args, unreal_import, paths
+):
+    unreal_import.AssetImportTask.return_value.imported_object_paths = paths
+    with pytest.raises(RuntimeError, match="expected one Geometry Cache asset"):
+        importer(**request_args)
+    unreal_import.EditorAssetLibrary.load_asset.assert_not_called()
+    unreal_import.new_object.assert_not_called()
+
+
+def test_duplicate_paths_do_not_skip_asset_type_check(importer, request_args, unreal_import):
+    unreal_import.AssetImportTask.return_value.imported_object_paths *= 2
+    unreal_import.EditorAssetLibrary.load_asset.return_value = object()
+    with pytest.raises(RuntimeError, match="did not produce a Geometry Cache"):
+        importer(**request_args)
+
+
+@pytest.mark.parametrize("frames,duration", [(1, 6.0), (180, 0.0)])
+def test_duplicate_paths_do_not_skip_animation_check(
+    importer, request_args, unreal_import, frames, duration
+):
+    unreal_import.AssetImportTask.return_value.imported_object_paths *= 2
+    component = unreal_import.new_object.return_value
+    component.get_number_of_frames.return_value = frames
+    component.get_duration.return_value = duration
+    with pytest.raises(RuntimeError, match="no animated sample range"):
+        importer(**request_args)

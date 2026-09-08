@@ -82,7 +82,8 @@ def main(source, destination, asset_name, scale, rotation, import_velocities=Fal
     task.options = settings
     started = time.monotonic()
     unreal.AssetToolsHelpers.get_asset_tools().import_asset_tasks([task])
-    imported = list(task.imported_object_paths)
+    # Unreal can report the same asset path more than once for one import.
+    imported = list(dict.fromkeys(task.imported_object_paths))
     if len(imported) != 1:
         raise RuntimeError("expected one Geometry Cache asset; got " + repr(imported))
     asset = library.load_asset(imported[0])
