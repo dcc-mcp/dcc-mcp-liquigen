@@ -724,7 +724,7 @@ def prepare_unreal_water_project(
             },
             {
                 "op": "create_group",
-                "comment": "DCC-MCP · OFFICIAL WATER TO UE 5.8",
+                "comment": "DCC-MCP · EXPORT EXAMPLE",
                 "color_index": 4,
                 "position": [680.0, 100.0],
                 "size": [470.0, 300.0],
@@ -1048,7 +1048,7 @@ def create_liquid_chain_burst_project(
                     "node_type": "Node_Export_Mesh",
                     "position": [910.0, 255.0],
                     "label": (
-                        "UE 5.8 VAT Export" if export_profile == "ue_vat" else "Alembic Export"
+                        "Unreal VAT Export" if export_profile == "ue_vat" else "Alembic Export"
                     ),
                     "parameters": {
                         "filename": "LiquiGen_ChainBurst",

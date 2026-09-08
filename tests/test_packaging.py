@@ -17,7 +17,7 @@ def test_installer_retries_transient_windows_launcher_lock():
     assert "dcc_mcp_liquigen_command_client.exe" in installer
 
 
-def test_internal_launch_and_hook_contract_is_documented():
+def test_standalone_launch_and_hook_contract_is_documented():
     readme = (PROJECT_ROOT / "README.md").read_text(encoding="utf-8")
     bridge_readme = (PROJECT_ROOT / "native" / "liquigen-command-bridge" / "README.md").read_text(
         encoding="utf-8"

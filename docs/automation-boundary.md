@@ -1,42 +1,20 @@
-# LiquiGen automation boundary
+# Automation contract
 
-## Confirmed local surface
+The adapter reads and writes the tagged `.liquigen` document format as an
+experimental compatibility layer. It is not a published JangaFX scripting API.
 
-The tested LiquiGen 1.0.5 package contains the application, official presets,
-templates, render resources, and licensing libraries. It does not contain a
-documented SDK, script folder, plug-in bridge, or headless exporter. A running
-instance does not expose a local TCP or UDP listener.
+1. Discover schemas with `list_node_schemas` and read projects with
+   `inspect_project_graph`.
+2. Use `apply_graph_transaction` for graph edits. Connections must use observed
+   pins, destinations must be new, and completed writes are reparsed.
+3. Use `open_project_path` and the fixed host-command list for live operations.
+   Commands execute against the bound PID/HWND and require host acknowledgement.
+4. Use `run_export_workflow` with a new empty output directory. It checks file
+   freshness, stability and bundle structure before reporting success.
 
-The `.liquigen` format is a tagged binary document with embedded thumbnail data.
-The local decoder consumed every byte of the installed official project corpus,
-resolved its reference records, and reproduced unchanged documents byte for
-byte. The writer is still an experimental compatibility layer, not a published
-JangaFX API.
+The named command bridge exposes no arbitrary native calls or input events.
+Use project-owned DCC-CUA for UI operations that have no typed route, retaining
+its exact-window binding and observation requirements. Licensing and activation
+are outside the adapter's command surface.
 
-## Supported routes
-
-1. Use `list_node_schemas` to discover node types, parameter names, and observed
-   input/output pins from the installed official projects.
-2. Use `inspect_project_graph` for structured graph readback.
-3. Use one `apply_graph_transaction` to create, clone, delete, configure,
-   animate, connect, or disconnect nodes. Writes are new-path-only, validate
-   observed pins, and reparse before success.
-4. Use `open_project_path` and the fixed host-command whitelist for project
-   loading, playback, export, graph framing, tabs, save, and command-palette
-   activation. These commands execute on the exact LiquiGen UI thread without
-   mouse, keyboard, or CUA.
-5. Use `run_export_workflow` for the complete open, simulate, export, freshness,
-   stability, and Unreal-bundle validation sequence. Its output directory must
-   be new and empty so LiquiGen never enters an overwrite-confirmation path.
-6. Use project-owned DCC-CUA only for optional visual viewport acceptance and
-   recording, or a genuinely unexposed future widget.
-
-Do not add a raw script executor, an adapter-local screenshot/input layer,
-arbitrary memory access, or an arbitrary native-call surface. Never patch or
-hook LiquiGen licensing or activation code. If JangaFX publishes a supported
-SDK or CLI, prefer it after a versioned live acceptance test.
-
-Official LiquiGen documentation describes project open/save and File > Export
-All as editor operations; it does not document a script or headless export
-surface. See the [UI reference](https://docs.jangafx.com/liquigen/pages/references/ui_reference.html)
-and [getting-started guide](https://docs.jangafx.com/liquigen/pages/getting_started.html).
+See the [examples](../examples/README.md) for export and receiver entry points.

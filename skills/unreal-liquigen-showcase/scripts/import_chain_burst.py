@@ -1,4 +1,4 @@
-"""Import and author a LiquiGen-style chain burst receiver in UE 5.8."""
+"""Import and author a LiquiGen-style chain burst receiver in Unreal."""
 
 from __future__ import annotations
 
@@ -94,7 +94,7 @@ def import_chain_burst(
         if any(asset is None for asset in verified.values()):
             raise RuntimeError("authored assets failed readback")
         return skill_success(
-            "Imported chain burst receiver into Unreal Engine 5.8",
+            "Imported chain burst receiver into Unreal",
             source_path=str(source),
             source_kind=source_kind,
             source_dimensions=[width, height],

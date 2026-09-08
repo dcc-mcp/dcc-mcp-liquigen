@@ -1,4 +1,4 @@
-"""Build a bounds-driven UE 5.8 stage for one finalized LiquiGen water VAT."""
+"""Build a bounds-driven Unreal stage for one finalized LiquiGen water VAT."""
 
 from __future__ import annotations
 

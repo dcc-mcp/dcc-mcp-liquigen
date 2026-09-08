@@ -1,4 +1,4 @@
-"""Lightbox-friendly launcher for one licensed LiquiGen instance."""
+"""Standalone launcher for one licensed LiquiGen instance."""
 
 from __future__ import annotations
 

@@ -1,4 +1,4 @@
-"""UE 5.8 ParticleSubUV and Niagara receiver authoring helpers."""
+"""Unreal ParticleSubUV and Niagara receiver authoring helpers."""
 
 from __future__ import annotations
 

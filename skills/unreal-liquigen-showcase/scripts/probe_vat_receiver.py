@@ -1,4 +1,4 @@
-"""Read-only live UE 5.8 probe for the LiquiGen VAT receiver dependencies."""
+"""Read-only live Unreal probe for the LiquiGen VAT receiver dependencies."""
 
 from __future__ import annotations
 
@@ -51,7 +51,7 @@ def probe_vat_receiver(**_kwargs) -> dict:
         if missing:
             return skill_error(
                 "LiquiGen VAT receiver dependency probe failed",
-                "missing UE 5.8 interfaces: " + ", ".join(missing),
+                "missing Unreal interfaces: " + ", ".join(missing),
                 possible_solutions=[
                     "Install and enable the SideFX Labs UE 5.8 content plugin.",
                     "Install and restart with a DCC-MCP Unreal plugin that exposes "
