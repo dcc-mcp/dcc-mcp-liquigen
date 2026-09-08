@@ -135,17 +135,6 @@ def detect_version(executable: Path, explicit: Optional[str] = None) -> str:
     match = re.search(r"(?i)[\\/]liquigen[\\/](\d+\.\d+\.\d+)(?:[\\/]|$)", str(executable))
     if match:
         return match.group(1)
-    for parent in executable.parents:
-        package_file = parent / "package.py"
-        if not package_file.is_file() or package_file.stat().st_size > 1024 * 1024:
-            continue
-        try:
-            text = package_file.read_text(encoding="utf-8", errors="strict")
-        except (OSError, UnicodeError):
-            continue
-        match = re.search(r"(?m)^version\s*=\s*['\"]([^'\"]+)['\"]", text)
-        if match:
-            return match.group(1)
     return "unknown"
 
 

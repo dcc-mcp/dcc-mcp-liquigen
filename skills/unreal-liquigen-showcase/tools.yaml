@@ -1,6 +1,6 @@
 tools:
   - name: probe_vat_receiver
-    description: Read-only verification that UE 5.8 exposes the SideFX fluid VAT material and every Python API used by the receiver.
+    description: Read-only verification that Unreal exposes the SideFX fluid VAT material and every Python API used by the receiver.
     source_file: scripts/probe_vat_receiver.py
     execution: sync
     affinity: main
@@ -107,7 +107,7 @@ tools:
       on-failure: [dcc_diagnostics__audit_log]
 
   - name: stage_water_vat
-    description: Stage a finalized LiquiGen water VAT StaticMesh with its UE-native translucent material in a bounds-driven UE 5.8 showcase level.
+    description: Stage a finalized LiquiGen water VAT StaticMesh with its UE-native translucent material in a bounds-driven Unreal showcase level.
     source_file: scripts/stage_water_vat.py
     execution: sync
     affinity: main
@@ -283,7 +283,7 @@ tools:
       on-failure: [dcc_diagnostics__audit_log]
 
   - name: stage_water_cascade
-    description: Stage an Unreal-native procedural LiquiGen water cascade in a deterministic UE 5.8 showcase level.
+    description: Stage an Unreal-native procedural LiquiGen water cascade in a deterministic Unreal showcase level.
     source_file: scripts/stage_water_cascade.py
     execution: sync
     affinity: main
@@ -472,7 +472,7 @@ tools:
       on-failure: [dcc_diagnostics__screenshot, dcc_diagnostics__audit_log]
 
   - name: stage_chain_burst
-    description: Build or refresh a deterministic UE 5.8 showcase level, spawn the Niagara chain burst, and frame the editor viewport camera.
+    description: Build or refresh a deterministic Unreal showcase level, spawn the Niagara chain burst, and frame the editor viewport camera.
     source_file: scripts/stage_chain_burst.py
     execution: sync
     affinity: main

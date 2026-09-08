@@ -1,4 +1,4 @@
-"""UE 5.8 receiver for canonical LiquiGen dynamic-remeshing VAT bundles."""
+"""Unreal receiver for canonical LiquiGen dynamic-remeshing VAT bundles."""
 
 from __future__ import annotations
 

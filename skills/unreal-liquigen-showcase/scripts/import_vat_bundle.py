@@ -1,4 +1,4 @@
-"""Stage a canonical LiquiGen dynamic-remeshing VAT bundle in UE 5.8."""
+"""Stage a canonical LiquiGen dynamic-remeshing VAT bundle in Unreal."""
 
 from __future__ import annotations
 
@@ -31,7 +31,7 @@ def import_vat_bundle(
         bundle = canonical_vat_bundle(source)
         result = import_vat_assets(unreal, bundle, destination, prefix)
         return skill_success(
-            "Staged canonical LiquiGen fluid VAT bundle in Unreal Engine 5.8",
+            "Staged canonical LiquiGen fluid VAT bundle in Unreal",
             source_directory=str(bundle["source"]),
             source_kind=source_kind,
             **result,

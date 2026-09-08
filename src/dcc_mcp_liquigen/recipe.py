@@ -235,7 +235,7 @@ def compile_liquid_chain_burst(
             {"id": "preset_and_project", "title": "Preset and project staging"},
             {"id": "node_graph_build", "title": "Transactional node-graph construction"},
             {"id": "simulation_and_export", "title": "Simulation and export validation"},
-            {"id": "unreal_import", "title": "Unreal Engine 5.8 import"},
+            {"id": "unreal_import", "title": "Unreal import"},
             {"id": "ue_material_authoring", "title": "Programmatic UE material authoring"},
             {"id": "runtime_verification", "title": "Niagara runtime verification"},
         ],

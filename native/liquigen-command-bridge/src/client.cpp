@@ -119,8 +119,7 @@ bool ProjectPathPayload(const std::wstring& path, std::string* result) noexcept 
 }
 
 std::wstring HookPath() {
-    // Lightbox/Rez setup packages may provide the bridge from a centrally
-    // managed location.  Prefer the explicit path, while retaining the
+    // Prefer an explicitly configured bridge path, while retaining the
     // installed-client sibling as the development/default fallback.
     wchar_t configured[32768]{};
     const auto configured_length = GetEnvironmentVariableW(

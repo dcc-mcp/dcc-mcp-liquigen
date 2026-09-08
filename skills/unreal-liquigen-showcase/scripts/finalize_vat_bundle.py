@@ -1,4 +1,4 @@
-"""Finalize one staged LiquiGen dynamic-remeshing VAT bundle in UE 5.8."""
+"""Finalize one staged LiquiGen dynamic-remeshing VAT bundle in Unreal."""
 
 from __future__ import annotations
 
@@ -31,7 +31,7 @@ def finalize_vat_bundle(
         bundle = canonical_vat_bundle(source)
         result = finalize_vat_assets(unreal, bundle, destination, prefix)
         return skill_success(
-            "Finalized canonical LiquiGen fluid VAT bundle in Unreal Engine 5.8",
+            "Finalized canonical LiquiGen fluid VAT bundle in Unreal",
             source_directory=str(bundle["source"]),
             source_kind=source_kind,
             **result,

@@ -1,4 +1,4 @@
-"""Build a deterministic UE 5.8 stage for a procedural LiquiGen water cascade."""
+"""Build a deterministic Unreal stage for a procedural LiquiGen water cascade."""
 
 from __future__ import annotations
 

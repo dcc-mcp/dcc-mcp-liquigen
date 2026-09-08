@@ -25,10 +25,9 @@ outside this bridge.
 Project open, play, pause, export, and graph-scoped commands require consumer
 acknowledgement. Event insertion alone is not success for those operations.
 
-## Managed bridge location
+## Configure the bridge location
 
-Internal `liquigen_setup` packages may set
-`DCC_MCP_LIQUIGEN_COMMAND_HOOK_DLL` to the fully qualified path of the approved
+Set `DCC_MCP_LIQUIGEN_COMMAND_HOOK_DLL` to the fully qualified path of the approved
 hook DLL. The command client validates that the value points to a regular file
 and loads that path for the current invocation. When the variable is absent, it
 falls back to a hook DLL next to the command client (the local development
