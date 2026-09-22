@@ -27,7 +27,9 @@ parameter, keyframe, group, note and camera edits, and validate the readback.
 For live operations, discover `list_host_commands` and use the fixed command
 list through `invoke_host_command` or `run_host_sequence`. Keep the exact
 PID/HWND binding. `run_export_workflow` opens a staged project and checks fresh,
-stable output in a new empty directory.
+stable output in every enabled export directory. Use empty, non-overlapping
+directories within the allowed roots. The result includes each validated bundle
+in `exports`; `bundle` and `fresh_files` refer to the requested `output_directory`.
 
 `prepare_unreal_water_project` stages an installed official preset with
 `export_profile: ue_vat` or `alembic`. Preserve the paired image exporter and

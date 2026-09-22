@@ -92,9 +92,13 @@ def _normalized_path(value: str) -> str:
     return os.path.normcase(str(Path(value).expanduser().resolve(strict=False)))
 
 
-def _configured_export_directories(project: Path, roots: Sequence[Path]) -> list[str]:
-    snapshot = inspect_project_graph(str(project), roots=roots)
-    directories: list[str] = []
+def _configured_export_targets(project: Path, roots: Sequence[Path]) -> dict[str, Optional[str]]:
+    """Collect every export destination before allowing export_all to reach the host."""
+
+    snapshot = inspect_project_graph(str(project), roots=roots, limit=500)
+    if snapshot.get("truncated"):
+        raise LiquiGenExportWorkflowError("export plan requires a complete project graph")
+    targets: dict[str, Optional[str]] = {}
     for node in snapshot["nodes"]:
         if not str(node.get("type", "")).startswith("Node_Export_"):
             continue
@@ -105,31 +109,43 @@ def _configured_export_directories(project: Path, roots: Sequence[Path]) -> list
                     "use prepare_unreal_water_project and configure its output path"
                 )
             continue
-        for parameter in node.get("parameters", []):
-            if parameter.get("name") == "directory" and isinstance(parameter.get("value"), str):
-                directories.append(str(parameter["value"]))
-    return sorted(set(directories), key=str.casefold)
-
-
-def _required_export_bundle_type(project: Path, roots: Sequence[Path]) -> Optional[str]:
-    """Return the primary enabled export contract that must actually finish."""
-
-    snapshot = inspect_project_graph(str(project), roots=roots)
-    for node in snapshot["nodes"]:
-        if node.get("type") != "Node_Export_Mesh":
-            continue
-        if node.get("disabled") is True or node.get("on") is False:
-            continue
         parameters = {
             parameter.get("name"): parameter.get("value")
             for parameter in node.get("parameters", [])
             if isinstance(parameter, dict)
         }
-        if parameters.get("export_kind") == "Vertex_Animated_Texture":
-            return "liquigen_vat"
-        if parameters.get("export_kind") == "Alembic":
-            return "alembic_geometry_cache"
-    return None
+        directory = parameters.get("directory")
+        if not isinstance(directory, str) or not directory.strip():
+            raise LiquiGenExportWorkflowError("every enabled export node requires a directory")
+        # Validate the original path before normalization can hide a relative path or link.
+        output = _resolve_output_directory(directory, roots)
+        key = _normalized_path(str(output))
+        required_type = None
+        if node.get("type") == "Node_Export_Mesh":
+            required_type = {
+                "Vertex_Animated_Texture": "liquigen_vat",
+                "Alembic": "alembic_geometry_cache",
+            }.get(parameters.get("export_kind"))
+        existing_type = targets.get(key)
+        if existing_type and required_type and existing_type != required_type:
+            raise LiquiGenExportWorkflowError(
+                "different mesh export modes require separate output directories"
+            )
+        targets[key] = required_type or existing_type
+    paths = [Path(directory) for directory in targets]
+    for index, path in enumerate(paths):
+        if any(path in other.parents or other in path.parents for other in paths[index + 1 :]):
+            raise LiquiGenExportWorkflowError("export output directories must not overlap")
+    return targets
+
+
+def _output_states(targets: Sequence[str]) -> dict[str, FileState]:
+    states = {directory: _file_state(Path(directory)) for directory in targets}
+    if sum(len(state) for state in states.values()) > MAX_EXPORT_FILES:
+        raise LiquiGenExportWorkflowError("export directories exceed the file-count limit")
+    if sum(size for state in states.values() for size, _ in state.values()) > MAX_EXPORT_BYTES:
+        raise LiquiGenExportWorkflowError("export directories exceed the byte limit")
+    return states
 
 
 def _fresh_paths(before: FileState, current: FileState) -> set[str]:
@@ -194,17 +210,17 @@ def run_export_workflow(
     selected_roots = tuple(roots or allowed_roots_from_env())
     project = resolve_project_path(project_path, selected_roots)
     output = _resolve_output_directory(output_directory, selected_roots)
-    configured_directories = _configured_export_directories(project, selected_roots)
+    targets = _configured_export_targets(project, selected_roots)
+    configured_directories = sorted(targets)
     normalized_output = _normalized_path(str(output))
-    if normalized_output not in {_normalized_path(item) for item in configured_directories}:
+    if normalized_output not in targets:
         raise LiquiGenExportWorkflowError(
             "output_directory is not configured on an enabled project export node"
         )
-    if _file_state(output):
+    if any(_output_states(configured_directories).values()):
         raise LiquiGenExportWorkflowError(
-            "output_directory must be empty; use a new directory for every export"
+            "every export output_directory must be empty; use new directories for every export"
         )
-    required_bundle_type = _required_export_bundle_type(project, selected_roots)
 
     commands: list[dict[str, object]] = []
 
@@ -228,78 +244,90 @@ def run_export_workflow(
         if settle_duration:
             sleep(settle_duration)
 
-    before = _file_state(output)
-    if before:
-        raise LiquiGenExportWorkflowError(
-            "output_directory changed before export; use another new directory"
-        )
     run("switch_tab_to_export", timeout_ms=10000)
     if settle_duration:
         sleep(settle_duration)
+    before = _output_states(configured_directories)
+    if any(before.values()):
+        raise LiquiGenExportWorkflowError(
+            "an output_directory changed before export; use new directories"
+        )
     run("export_all", timeout_ms=30000)
     started_at = monotonic()
     deadline = started_at + timeout
-    last_state = _file_state(output)
+    last_state = _output_states(configured_directories)
     stable_since = monotonic()
-    last_validation_error = "export produced no fresh files"
+    last_validation_error = "export produced no fresh files in every configured directory"
 
     while monotonic() <= deadline:
-        current = _file_state(output)
+        current = _output_states(configured_directories)
         if current != last_state:
             last_state = current
             stable_since = monotonic()
-        fresh = _fresh_paths(before, current)
         now = monotonic()
-        if fresh and now - stable_since >= stable_duration:
-            try:
-                bundle = validate_unreal_export_bundle(str(output), roots=selected_roots)
-            except LiquiGenExportError as error:
-                last_validation_error = str(error)
-            else:
-                if bundle["valid"] is True:
+        if all(current.values()) and now - stable_since >= stable_duration:
+            exports = []
+            for directory, required_bundle_type in targets.items():
+                fresh = _fresh_paths(before[directory], current[directory])
+                try:
+                    bundle = validate_unreal_export_bundle(directory, roots=selected_roots)
+                    if bundle["valid"] is not True:
+                        raise LiquiGenExportError(
+                            "; ".join(str(item) for item in bundle.get("errors", []))
+                        )
                     if required_bundle_type and bundle.get("bundle_type") != required_bundle_type:
-                        last_validation_error = (
+                        raise LiquiGenExportError(
                             f"expected {required_bundle_type}, got "
                             f"{bundle.get('bundle_type', 'unknown')}"
                         )
-                        sleep(poll_interval)
-                        continue
                     required = _required_fresh_paths(bundle)
-                    stale_required = sorted(required - fresh)
-                    if required and not stale_required:
-                        return {
-                            "interface": EXPORT_WORKFLOW_INTERFACE,
-                            "success": True,
-                            "project_path": str(project),
-                            "output_directory": str(output),
-                            "configured_output_directories": configured_directories,
-                            "commands": commands,
-                            "simulation_seconds": simulation_duration,
-                            "elapsed_seconds": round(now - started_at, 3),
-                            "stable_seconds": stable_duration,
-                            "settle_seconds": settle_duration,
-                            "fresh_files": sorted(fresh),
-                            "requires_cua": False,
-                            "completion_boundary": (
-                                "fresh required export assets are stable and bundle "
-                                "validation passed"
-                            ),
-                            "bundle": bundle,
-                        }
-                    last_validation_error = (
-                        "required export assets were not refreshed: "
-                        + ", ".join(stale_required or sorted(required))
+                    if not required or required - fresh:
+                        raise LiquiGenExportError("required export assets were not refreshed")
+                except LiquiGenExportError as error:
+                    last_validation_error = f"{directory}: {error}"
+                    break
+                exports.append(
+                    {"output_directory": directory, "fresh_files": sorted(fresh), "bundle": bundle}
+                )
+            else:
+                # Validation hashes files and can take time; reject files changed during it.
+                verified_state = _output_states(configured_directories)
+                if verified_state == current and monotonic() <= deadline:
+                    selected = next(
+                        item for item in exports if item["output_directory"] == normalized_output
                     )
-                else:
-                    last_validation_error = "; ".join(
-                        str(item) for item in bundle.get("errors", [])
-                    )
+                    return {
+                        "interface": EXPORT_WORKFLOW_INTERFACE,
+                        "success": True,
+                        "project_path": str(project),
+                        "output_directory": str(output),
+                        "configured_output_directories": configured_directories,
+                        "commands": commands,
+                        "simulation_seconds": simulation_duration,
+                        "elapsed_seconds": round(monotonic() - started_at, 3),
+                        "stable_seconds": stable_duration,
+                        "settle_seconds": settle_duration,
+                        "fresh_files": selected["fresh_files"],
+                        "requires_cua": False,
+                        "completion_boundary": (
+                            "fresh required export assets are stable and bundle validation "
+                            "passed in every configured output directory"
+                        ),
+                        "bundle": selected["bundle"],
+                        "exports": exports,
+                    }
+                last_state = verified_state
+                stable_since = monotonic()
+                last_validation_error = "export files changed during validation or timeout elapsed"
+        else:
+            empty = [directory for directory, state in current.items() if not state]
+            if empty:
+                last_validation_error = "export produced no fresh files in: " + ", ".join(empty)
         sleep(poll_interval)
 
-    fresh = sorted(_fresh_paths(before, _file_state(output)))
     raise LiquiGenExportWorkflowError(
-        "export did not produce a fresh stable valid bundle before timeout; "
-        f"fresh_files={fresh!r}; last_validation_error={last_validation_error}"
+        "export did not produce fresh stable valid bundles before timeout; "
+        f"last_validation_error={last_validation_error}"
     )
 
 
