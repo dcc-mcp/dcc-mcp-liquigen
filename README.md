@@ -10,7 +10,7 @@ execute supported host commands, and validate exported assets.
 **dcc-mcp-liquigen** — LiquiGen adapter with typed node-graph inspection, simulation
 controls, VAT export, and Unreal Engine handoff.
 
-It is one of **38 host adapters** in the DCC-MCP catalog. Every adapter speaks the same
+It is one of **47 host adapters** in the DCC-MCP catalog. Every adapter speaks the same
 MCP protocol and builds on the same core runtime contract; each one exposes the tools
 its own host needs on top of that.
 
