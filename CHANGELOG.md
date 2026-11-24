@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.3.1](https://github.com/dcc-mcp/dcc-mcp-liquigen/compare/v0.3.0...v0.3.1) (2026-11-24)
+
+
+### Documentation
+
+* refresh the generated DCC-MCP host matrix pointer ([22acb26](https://github.com/dcc-mcp/dcc-mcp-liquigen/commit/22acb26541f9fe3ce4b086ce6e350f709903b9c9))
+* refresh the generated DCC-MCP host matrix pointer ([97e36d1](https://github.com/dcc-mcp/dcc-mcp-liquigen/commit/97e36d1081e972f38065f790336970cb79330d8c))
+
 ## [0.3.0](https://github.com/dcc-mcp/dcc-mcp-liquigen/compare/v0.2.0...v0.3.0) (2026-10-09)
 
 
