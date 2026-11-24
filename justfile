@@ -43,3 +43,8 @@ local-release: build
     vx uv run python -m dcc_mcp_liquigen.packaging --project-root . --output-dir dist --include-native-bridge --native-bridge-dir {{command_native_build_dir}}/Release
 
 check: lint test
+
+
+# Verify the pinned VX and just toolchain.
+toolchain-ci:
+    vx just@1.58 --version
